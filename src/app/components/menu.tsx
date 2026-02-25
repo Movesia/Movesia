@@ -2,7 +2,7 @@ import { useEventListener } from '@/app/hooks';
 import { MenuChannels } from '@/channels/menuChannels';
 import { fixAcceleratorText } from '@/menu/accelerators';
 import menuList from '@/menu/appMenu';
-import appLogo from 'assets/icons/icon.png';
+import appLogo from '@/app/assets/Movesia-Logo-Black.svg';
 
 import { createRef, useMemo, useRef } from 'react';
 

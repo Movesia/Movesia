@@ -23,7 +23,7 @@ const config: ForgeConfig = {
     // Set application copyright
     appCopyright: `Copyright © ${new Date().getFullYear()} ${author.name}`,
     // Set application icon
-    icon: path.resolve(rootDir, 'assets/icons/icon')
+    icon: path.resolve(rootDir, 'resources/favicon')
   },
   rebuildConfig: {},
   makers: [

@@ -1,26 +1,26 @@
 {
-  "name": "reactronite",
-  "productName": "Reactronite",
-  "version": "2.3.2",
-  "description": "A modern, feature-rich Electron kit for building cross-platform desktop applications",
+  "name": "movesia",
+  "productName": "Movesia",
+  "version": "0.1.0",
+  "description": "AI-powered desktop assistant for Unity Editor — manage scenes, GameObjects, and scripts through natural conversation",
   "main": ".vite/build/main.js",
   "license": "MIT",
   "packageManager": "pnpm@10.18.3",
   "type": "module",
   "keywords": [
+    "unity",
+    "ai",
+    "game-development",
     "electron",
-    "react",
-    "typescript",
-    "boilerplate",
-    "electron-forge",
-    "vite"
+    "langraph",
+    "desktop-app"
   ],
   "author": {
-    "name": "Flavio Del Grosso"
+    "name": "Movesia"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/flaviodelgrosso/reactronite.git"
+    "url": "https://github.com/movesia/movesia.git"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

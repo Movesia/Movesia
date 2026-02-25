@@ -33,6 +33,7 @@ export function createAppWindow (): BrowserWindow {
     show: false,
     autoHideMenuBar: true,
     frame: false,
+    icon: path.join(import.meta.dirname, '../../resources/favicon.ico'),
     backgroundColor: '#f8f9fa',
     webPreferences: {
       nodeIntegration: false,
