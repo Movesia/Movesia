@@ -33,7 +33,7 @@ export function createAppWindow (): BrowserWindow {
     show: false,
     autoHideMenuBar: true,
     frame: false,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#f8f9fa',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

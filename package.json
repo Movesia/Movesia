@@ -58,6 +58,7 @@
     "prettier-plugin-space-before-function-paren": "^0.0.9",
     "prism-react-renderer": "^2.4.1",
     "prismjs": "^1.30.0",
+    "radix-ui": "^1.4.3",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-markdown": "^10.1.0",

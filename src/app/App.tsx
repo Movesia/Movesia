@@ -1,4 +1,5 @@
 import { ThemeProvider } from '@/app/components/theme-provider';
+import { TooltipProvider } from '@/app/components/ui/tooltip';
 import Titlebar from '@/app/components/titlebar';
 import { useRendererListener } from '@/app/hooks';
 import { ChatScreen } from '@/app/screens/chat';
@@ -14,17 +15,19 @@ export default function App () {
   useRendererListener(MenuChannels.MENU_EVENT, onMenuEvent);
 
   return (
-    <ThemeProvider defaultTheme='dark' storageKey='vite-ui-theme'>
-      <Router>
-        <div className='flex flex-col h-full'>
-          <Titlebar />
-          <main className='flex-1 overflow-hidden'>
-            <Routes>
-              <Route path='/' Component={ChatScreen} />
-            </Routes>
-          </main>
-        </div>
-      </Router>
+    <ThemeProvider defaultTheme='light' storageKey='movesia-theme'>
+      <TooltipProvider>
+        <Router>
+          <div className='flex flex-col h-full'>
+            <Titlebar />
+            <main className='flex-1 overflow-hidden'>
+              <Routes>
+                <Route path='/' Component={ChatScreen} />
+              </Routes>
+            </main>
+          </div>
+        </Router>
+      </TooltipProvider>
     </ThemeProvider>
   );
 }
