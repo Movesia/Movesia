@@ -56,4 +56,7 @@ export interface Thread {
   title: string
   createdAt: Date
   messageCount: number
+  /** Unity project associated with this thread */
+  projectName?: string
+  projectVersion?: string
 }

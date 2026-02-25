@@ -40,6 +40,9 @@
   --font-serif: Source Serif 4, serif;
   --font-mono: JetBrains Mono, monospace;
   --radius: 0.625rem;
+  --sidebar-width: 21rem;
+  --sidebar-width-mobile: 18rem;
+  --sidebar-width-icon: 3rem;
   --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
   --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
   --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
@@ -130,6 +133,10 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  --sidebar-width: var(--sidebar-width);
+  --sidebar-width-mobile: var(--sidebar-width-mobile);
+  --sidebar-width-icon: var(--sidebar-width-icon);
 
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
@@ -241,6 +248,38 @@
     @apply bg-destructive;
   }
 }
+
+/* Sidebar — offset for Electron frameless titlebar (h-8 = 2rem) */
+[data-slot="sidebar-container"] {
+  top: 2rem;
+  height: calc(100svh - 2rem);
+}
+
+/* Sidebar — thin subtle scrollbar */
+[data-slot="sidebar-content"]::-webkit-scrollbar {
+  width: 4px;
+}
+
+[data-slot="sidebar-content"]::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+[data-slot="sidebar-content"]::-webkit-scrollbar-thumb {
+  background: var(--sidebar-border);
+  border-radius: 9999px;
+}
+
+[data-slot="sidebar-content"]::-webkit-scrollbar-thumb:hover {
+  background: var(--sidebar-foreground, currentColor);
+  opacity: 0.3;
+}
+
+/* Sidebar — text fade gradient (instead of ellipsis truncation) */
+.fade-text {
+  mask-image: linear-gradient(to right, black calc(100% - 0.4rem), transparent);
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 0.4rem), transparent);
+}
+
 
 /* Loader keyframe animations */
 @keyframes typing-bounce {

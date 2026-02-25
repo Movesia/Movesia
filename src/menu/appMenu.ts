@@ -1,26 +1,8 @@
 import { MenuChannels } from '@/channels/menuChannels';
-import { emitEvent } from '@/webContents';
 
 const MenuItems: Electron.MenuItemConstructorOptions[] = [
   {
-    label: 'Reactronite',
-    submenu: [
-      {
-        label: 'About Reactronite',
-      },
-      {
-        type: 'separator',
-      },
-      {
-        id: MenuChannels.WINDOW_CLOSE,
-        label: 'Exit',
-        role: 'quit',
-        accelerator: 'CmdOrCtrl+Q',
-      },
-    ],
-  },
-  {
-    label: 'View',
+    label: 'Menu',
     submenu: [
       {
         id: MenuChannels.WEB_ACTUAL_SIZE,
@@ -52,19 +34,18 @@ const MenuItems: Electron.MenuItemConstructorOptions[] = [
       },
       {
         id: MenuChannels.WEB_TOGGLE_DEVTOOLS,
-        label: 'Toogle Developer Tools',
+        label: 'Toggle Developer Tools',
         role: 'toggleDevTools',
         accelerator: 'CmdOrCtrl+Shift+I',
       },
-    ],
-  },
-  {
-    label: 'Authors',
-    submenu: [
       {
-        id: MenuChannels.OPEN_GITHUB_PROFILE,
-        label: 'flaviodelgrosso',
-        click: emitEvent(MenuChannels.OPEN_GITHUB_PROFILE, 'flaviodelgrosso'),
+        type: 'separator',
+      },
+      {
+        id: MenuChannels.WINDOW_CLOSE,
+        label: 'Exit',
+        role: 'quit',
+        accelerator: 'CmdOrCtrl+Q',
       },
     ],
   },

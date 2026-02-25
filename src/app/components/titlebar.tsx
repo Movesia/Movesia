@@ -1,5 +1,6 @@
 import { useRendererListener } from '@/app/hooks';
 import { MenuChannels } from '@/channels/menuChannels';
+import { SidebarTrigger } from '@/app/components/ui/sidebar';
 
 import { useState } from 'react';
 
@@ -27,6 +28,9 @@ export default function Titlebar () {
       {__WIN32__ && (
         <>
           <Menu />
+          <section className='flex items-center px-2.5' style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+            <SidebarTrigger className='size-4' />
+          </section>
           <WindowControls windowState={windowState} />
         </>
       )}

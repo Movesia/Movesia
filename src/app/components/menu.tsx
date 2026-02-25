@@ -5,6 +5,7 @@ import menuList from '@/menu/appMenu';
 import appLogo from '@/app/assets/Movesia-Logo-Black.svg';
 
 import { createRef, useMemo, useRef } from 'react';
+import { Menu as MenuIcon } from 'lucide-react';
 
 import type React from 'react';
 
@@ -90,12 +91,12 @@ export default function Menu () {
 
   return (
     <section className='window-titlebar-menu'>
-      {/* Titlebar icon */}
+      {/* App logo */}
       <section className='window-titlebar-icon'>
         <img src={appLogo} alt='App logo' />
       </section>
 
-      {menuList.map(({ label, submenu }, menuIndex) => {
+      {menuList.map(({ submenu }, menuIndex) => {
         return (
           <div className='menu-item' key={`menu_${menuIndex + 1}`}>
             <button
@@ -108,7 +109,7 @@ export default function Menu () {
               onDoubleClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.preventDefault()}
             >
-              {label}
+              <MenuIcon className='w-4 h-4' />
             </button>
             <div className='menu-popup' ref={menusRef[menuIndex]}>
               {Array.isArray(submenu) &&
