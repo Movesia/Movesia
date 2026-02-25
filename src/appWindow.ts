@@ -1,7 +1,6 @@
 import path from 'node:path';
 
 import { registerMenuIpc } from '@/ipc/menuIPC';
-import appMenu from '@/menu/appMenu';
 import { registerWindowStateChangedEvents } from '@/windowState';
 
 import { BrowserWindow, Menu, app } from 'electron';
@@ -58,9 +57,8 @@ export function createAppWindow (): BrowserWindow {
     appWindow.loadFile(path.join(import.meta.dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
   }
 
-  // Build the application menu
-  const menu = Menu.buildFromTemplate(appMenu);
-  Menu.setApplicationMenu(menu);
+  // Remove native menu — handled by custom React menu in renderer
+  Menu.setApplicationMenu(null);
 
   // Show window when is ready to
   appWindow.on('ready-to-show', () => {

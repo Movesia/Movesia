@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { ThemeProvider } from '@/app/components/theme-provider';
 import { TooltipProvider } from '@/app/components/ui/tooltip';
-import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/app/components/ui/sidebar';
+import { SidebarProvider, SidebarInset } from '@/app/components/ui/sidebar';
 import { AppSidebar } from '@/app/components/app-sidebar';
 import type { UserProfile } from '@/app/components/app-sidebar';
 import Titlebar from '@/app/components/titlebar';

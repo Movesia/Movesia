@@ -1,6 +1,7 @@
 import { useRendererListener } from '@/app/hooks';
 import { MenuChannels } from '@/channels/menuChannels';
 import { SidebarTrigger } from '@/app/components/ui/sidebar';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/tooltip';
 
 import { useState } from 'react';
 
@@ -29,7 +30,14 @@ export default function Titlebar () {
         <>
           <Menu />
           <section className='flex items-center px-2.5' style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-            <SidebarTrigger className='size-4' />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <SidebarTrigger className='size-4' />
+              </TooltipTrigger>
+              <TooltipContent side='bottom'>
+                <p>Toggle Sidebar <kbd className='ml-1 text-[10px] opacity-60'>Ctrl+B</kbd></p>
+              </TooltipContent>
+            </Tooltip>
           </section>
           <WindowControls windowState={windowState} />
         </>

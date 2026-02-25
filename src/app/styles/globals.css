@@ -40,7 +40,7 @@
   --font-serif: Source Serif 4, serif;
   --font-mono: JetBrains Mono, monospace;
   --radius: 0.625rem;
-  --sidebar-width: 21rem;
+  --sidebar-width: 24rem;
   --sidebar-width-mobile: 18rem;
   --sidebar-width-icon: 3rem;
   --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
@@ -203,7 +203,7 @@
   }
 
   .menu-popup {
-    @apply hidden fixed bg-popover z-10000 min-w-20;
+    @apply hidden fixed bg-popover z-10000 min-w-36 border border-border rounded-sm shadow-md py-1;
   }
 
   .menu-popup.active {
@@ -232,6 +232,28 @@
 
   .popup-item-separator {
     @apply bg-border h-[1px] my-1;
+  }
+
+  /* Nested submenu */
+  .submenu-parent {
+    @apply relative;
+  }
+
+  .submenu-trigger {
+    @apply items-center;
+  }
+
+  .submenu-popup {
+    @apply hidden absolute top-0 bg-popover z-10000 min-w-44 border border-border rounded-sm shadow-md;
+    left: 100%;
+  }
+
+  .submenu-parent:hover > .submenu-popup {
+    @apply block;
+  }
+
+  .submenu-parent:hover > .submenu-trigger {
+    @apply bg-accent text-accent-foreground;
   }
 
   /* Window Controls */
@@ -276,8 +298,8 @@
 
 /* Sidebar — text fade gradient (instead of ellipsis truncation) */
 .fade-text {
-  mask-image: linear-gradient(to right, black calc(100% - 0.4rem), transparent);
-  -webkit-mask-image: linear-gradient(to right, black calc(100% - 0.4rem), transparent);
+  mask-image: linear-gradient(to right, black calc(100% - 0.2rem), transparent);
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 0.2rem), transparent);
 }
 
 

@@ -21,7 +21,6 @@ import {
   SidebarMenuButton,
   SidebarMenuAction,
   SidebarRail,
-  SidebarSeparator,
   useSidebar,
 } from '@/app/components/ui/sidebar'
 import {
@@ -34,6 +33,7 @@ import {
   DropdownMenuTrigger,
 } from '@/app/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/app/components/ui/avatar'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/tooltip'
 import type { Thread } from '@/app/lib/types/chat'
 
 // =============================================================================
@@ -106,7 +106,7 @@ function ThreadMenuItem ({
         isActive={isActive}
         tooltip={thread.title}
         size='lg'
-        className='h-auto py-2'
+        className='h-auto py-2 cursor-pointer'
       >
         <div className='grid flex-1 text-left leading-tight min-w-0'>
           <span className='overflow-hidden whitespace-nowrap text-sm font-semibold fade-text'>{thread.title}</span>
@@ -118,17 +118,24 @@ function ThreadMenuItem ({
           )}
         </div>
       </SidebarMenuButton>
-      <SidebarMenuAction
-        onClick={(e) => {
-          e.stopPropagation()
-          onDelete()
-        }}
-        showOnHover
-        title='Delete thread'
-      >
-        <Trash2 />
-        <span className='sr-only'>Delete</span>
-      </SidebarMenuAction>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <SidebarMenuAction
+            onClick={(e) => {
+              e.stopPropagation()
+              onDelete()
+            }}
+            showOnHover
+            className='size-6 rounded-full bg-sidebar-accent hover:bg-sidebar-accent-foreground/10 hover:text-sidebar-accent-foreground flex items-center justify-center cursor-pointer transition-colors duration-300'
+          >
+            <Trash2 className='size-3' />
+            <span className='sr-only'>Delete</span>
+          </SidebarMenuAction>
+        </TooltipTrigger>
+        <TooltipContent side='bottom'>
+          <p>Delete thread</p>
+        </TooltipContent>
+      </Tooltip>
     </SidebarMenuItem>
   )
 }
@@ -274,9 +281,7 @@ export function AppSidebar ({
         )}
       </SidebarContent>
 
-      <SidebarSeparator />
-
-      <SidebarFooter>
+      <SidebarFooter className='border-t border-sidebar-border'>
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>

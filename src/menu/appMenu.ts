@@ -1,12 +1,30 @@
 import { MenuChannels } from '@/channels/menuChannels';
 
-const MenuItems: Electron.MenuItemConstructorOptions[] = [
+export type MenuItemWithUrl = Electron.MenuItemConstructorOptions & { url?: string };
+
+export interface MenuGroup {
+  label: string;
+  items: MenuItemWithUrl[];
+}
+
+const MenuGroups: MenuGroup[] = [
   {
-    label: 'Menu',
-    submenu: [
+    label: 'File',
+    items: [
+      {
+        id: MenuChannels.WINDOW_CLOSE,
+        label: 'Exit',
+        role: 'quit',
+        accelerator: 'CmdOrCtrl+Q',
+      },
+    ],
+  },
+  {
+    label: 'View',
+    items: [
       {
         id: MenuChannels.WEB_ACTUAL_SIZE,
-        label: 'Reset Zoom',
+        label: 'Actual Size',
         role: 'resetZoom',
         accelerator: 'CmdOrCtrl+0',
       },
@@ -38,17 +56,26 @@ const MenuItems: Electron.MenuItemConstructorOptions[] = [
         role: 'toggleDevTools',
         accelerator: 'CmdOrCtrl+Shift+I',
       },
+    ],
+  },
+  {
+    label: 'Help',
+    items: [
+      {
+        id: MenuChannels.OPEN_URL,
+        label: 'Documentation',
+        url: 'https://movesia.com/docs',
+      },
       {
         type: 'separator',
       },
       {
-        id: MenuChannels.WINDOW_CLOSE,
-        label: 'Exit',
-        role: 'quit',
-        accelerator: 'CmdOrCtrl+Q',
+        id: MenuChannels.OPEN_URL,
+        label: 'About Movesia',
+        url: 'https://movesia.com',
       },
     ],
   },
 ];
 
-export default MenuItems;
+export default MenuGroups;

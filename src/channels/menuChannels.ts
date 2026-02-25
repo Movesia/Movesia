@@ -9,6 +9,7 @@ export const MenuChannels = {
   WEB_ZOOM_OUT: 'web-zoom-out',
   WEB_TOGGLE_FULLSCREEN: 'web-toggle-fullscreen',
   OPEN_GITHUB_PROFILE: 'open-github-profile',
+  OPEN_URL: 'open-url',
   MENU_EVENT: 'menu-event',
   EXECUTE_MENU_ITEM_BY_ID: 'execute-menu-item-by-id',
   SHOW_CONTEXT_MENU: 'show-context-menu',
