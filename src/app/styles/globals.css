@@ -241,3 +241,52 @@
     @apply bg-destructive;
   }
 }
+
+/* Loader keyframe animations */
+@keyframes typing-bounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes wave {
+  0%, 40%, 100% {
+    transform: scaleY(0.4);
+  }
+  20% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes bars {
+  0%, 100% {
+    transform: scaleY(0.5);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.loading-dots-anim {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+  animation: loading-dots-width 1.5s steps(4, end) infinite;
+}
+
+@keyframes loading-dots-width {
+  0% { width: 0; }
+  100% { width: 1.25em; }
+}
