@@ -9,7 +9,6 @@ import {
 } from '@/app/components/ui/dropdown-menu'
 import {
   PromptInput,
-  PromptInputAction,
   PromptInputActions,
   PromptInputTextarea,
 } from '@/app/components/prompt-kit/prompt-input'
@@ -24,7 +23,6 @@ import { ScrollButton } from '@/app/components/prompt-kit/scroll-button'
 import { FeedbackBar } from '@/app/components/prompt-kit/feedback-bar'
 import { PromptSuggestion } from '@/app/components/prompt-kit/prompt-suggestion'
 
-
 // =============================================================================
 // Suggestions
 // =============================================================================
@@ -32,7 +30,6 @@ import { PromptSuggestion } from '@/app/components/prompt-kit/prompt-suggestion'
 const SUGGESTIONS = [
   'Show me the scene hierarchy',
   'Create a player movement script',
-  'Add a Rigidbody to the Player',
   'Analyze my project build size',
 ]
 
@@ -312,8 +309,7 @@ export function ChatScreen () {
         <div className='flex-1' />
         <div className='flex flex-col items-center px-4 pb-2'>
           <h1 className='text-4xl font-bold mb-8'>What can I do for you?</h1>
-          <div className='w-full max-w-[740px]'>{promptInput}</div>
-          <div className='flex flex-wrap justify-center gap-2 mt-4 max-w-[740px]'>
+          <div className='flex flex-wrap justify-center gap-2 mb-4 max-w-[740px]'>
             {SUGGESTIONS.map((suggestion) => (
               <PromptSuggestion
                 key={suggestion}
@@ -325,6 +321,8 @@ export function ChatScreen () {
               </PromptSuggestion>
             ))}
           </div>
+
+          <div className='w-full max-w-[740px]'>{promptInput}</div>
         </div>
         <div className='flex-1' />
       </div>
