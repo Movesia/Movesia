@@ -7,10 +7,11 @@ import type { UserProfile } from '@/app/components/app-sidebar';
 import Titlebar from '@/app/components/titlebar';
 import { useRendererListener } from '@/app/hooks';
 import { ChatScreen } from '@/app/screens/chat';
+import { SettingsScreen } from '@/app/screens/settings';
 import { MenuChannels } from '@/channels/menuChannels';
 import type { Thread } from '@/app/lib/types/chat';
 
-import { Route, HashRouter as Router, Routes } from 'react-router-dom';
+import { Route, HashRouter as Router, Routes, useNavigate } from 'react-router-dom';
 
 const onMenuEvent = (_: Electron.IpcRendererEvent, channel: string, ...args: unknown[]) => {
   electron.ipcRenderer.invoke(channel, args);
@@ -44,7 +45,8 @@ const INITIAL_THREADS: Thread[] = [
   { id: '15', title: 'Create save and load system with JSON serialization', createdAt: new Date(Date.now() - 604800000), messageCount: 10, projectName: 'Dungeon Crawler', projectVersion: '6000.0.32f1' },
 ];
 
-export default function App () {
+function AppShell () {
+  const navigate = useNavigate();
   useRendererListener(MenuChannels.MENU_EVENT, onMenuEvent);
 
   const [threads, setThreads] = useState<Thread[]>(INITIAL_THREADS);
@@ -66,28 +68,40 @@ export default function App () {
     setCurrentThreadId((prev) => (prev === threadId ? null : prev));
   }, []);
 
+  const handleSettings = useCallback(() => {
+    navigate('/settings');
+  }, [navigate]);
+
+  return (
+    <SidebarProvider defaultOpen={false} className='flex-col h-full min-h-0'>
+      <Titlebar />
+      <div className='min-h-0 flex-1 flex'>
+        <AppSidebar
+          threads={threads}
+          currentThreadId={currentThreadId}
+          user={MOCK_USER}
+          onSelectThread={setCurrentThreadId}
+          onNewThread={handleNewThread}
+          onDeleteThread={handleDeleteThread}
+          onSettings={handleSettings}
+        />
+        <SidebarInset>
+          <Routes>
+            <Route path='/' Component={ChatScreen} />
+            <Route path='/settings' Component={SettingsScreen} />
+          </Routes>
+        </SidebarInset>
+      </div>
+    </SidebarProvider>
+  );
+}
+
+export default function App () {
   return (
     <ThemeProvider defaultTheme='light' storageKey='movesia-theme'>
       <TooltipProvider>
         <Router>
-          <SidebarProvider defaultOpen={false} className='flex-col h-full min-h-0'>
-            <Titlebar />
-            <div className='min-h-0 flex-1 flex'>
-              <AppSidebar
-                threads={threads}
-                currentThreadId={currentThreadId}
-                user={MOCK_USER}
-                onSelectThread={setCurrentThreadId}
-                onNewThread={handleNewThread}
-                onDeleteThread={handleDeleteThread}
-              />
-              <SidebarInset>
-                <Routes>
-                  <Route path='/' Component={ChatScreen} />
-                </Routes>
-              </SidebarInset>
-            </div>
-          </SidebarProvider>
+          <AppShell />
         </Router>
       </TooltipProvider>
     </ThemeProvider>
