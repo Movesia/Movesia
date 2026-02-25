@@ -1,7 +1,7 @@
 import { ThemeProvider } from '@/app/components/theme-provider';
 import Titlebar from '@/app/components/titlebar';
 import { useRendererListener } from '@/app/hooks';
-import { LandingScreen } from '@/app/screens/landing';
+import { ChatScreen } from '@/app/screens/chat';
 import { MenuChannels } from '@/channels/menuChannels';
 
 import { Route, HashRouter as Router, Routes } from 'react-router-dom';
@@ -18,9 +18,9 @@ export default function App () {
       <Router>
         <div className='flex flex-col h-full'>
           <Titlebar />
-          <main className='flex-1 overflow-auto'>
+          <main className='flex-1 overflow-hidden'>
             <Routes>
-              <Route path='/' Component={LandingScreen} />
+              <Route path='/' Component={ChatScreen} />
             </Routes>
           </main>
         </div>

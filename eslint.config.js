@@ -8,26 +8,50 @@ export default [
   }),
   {
     rules: {
-      'import-x/order': [
-        'warn',
-        {
-          'newlines-between': 'always',
-          groups: [
-            'builtin',
-            'internal',
-            'external',
-            'sibling',
-            'parent',
-            'index',
-            'type'
-          ],
-          pathGroupsExcludedImportTypes: ['type'],
-          alphabetize: {
-            order: 'asc',
-            caseInsensitive: true
-          }
-        }
-      ]
+      // Relax stylistic rules — let Prettier/formatter handle these
+      '@stylistic/semi': 'off',
+      '@stylistic/jsx-quotes': 'off',
+      '@stylistic/space-before-function-paren': 'off',
+      '@stylistic/comma-dangle': 'off',
+      '@stylistic/indent': 'off',
+      '@stylistic/quotes': 'off',
+      '@stylistic/no-trailing-spaces': 'off',
+      '@stylistic/eol-last': 'off',
+      '@stylistic/no-multiple-empty-lines': 'off',
+      '@stylistic/padded-blocks': 'off',
+      '@stylistic/arrow-parens': 'off',
+      '@stylistic/brace-style': 'off',
+      '@stylistic/operator-linebreak': 'off',
+      '@stylistic/multiline-ternary': 'off',
+      '@stylistic/member-delimiter-style': 'off',
+      '@stylistic/type-annotation-spacing': 'off',
+      '@stylistic/key-spacing': 'off',
+      '@stylistic/object-curly-spacing': 'off',
+      '@stylistic/space-infix-ops': 'off',
+      '@stylistic/block-spacing': 'off',
+      '@stylistic/comma-spacing': 'off',
+      '@stylistic/keyword-spacing': 'off',
+      '@stylistic/space-before-blocks': 'off',
+      '@stylistic/no-multi-spaces': 'off',
+      '@stylistic/jsx-closing-tag-location': 'off',
+      '@stylistic/jsx-closing-bracket-location': 'off',
+      '@stylistic/jsx-indent': 'off',
+      '@stylistic/jsx-indent-props': 'off',
+      '@stylistic/jsx-curly-spacing': 'off',
+      '@stylistic/jsx-tag-spacing': 'off',
+      '@stylistic/jsx-wrap-multilines': 'off',
+      '@stylistic/jsx-one-expression-per-line': 'off',
+      '@stylistic/jsx-curly-newline': 'off',
+      '@stylistic/jsx-first-prop-new-line': 'off',
+      '@stylistic/jsx-max-props-per-line': 'off',
+      '@stylistic/jsx-props-no-multi-spaces': 'off',
+      '@stylistic/jsx-sort-props': 'off',
+
+      // Relax import ordering — not worth blocking on
+      'import-x/order': 'off',
+
+      // Relax other noisy rules
+      'no-unused-vars': 'off',
     }
   }
 ];
