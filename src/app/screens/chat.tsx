@@ -1,6 +1,12 @@
 import { useRef, useState, useCallback } from 'react'
-import { ArrowUp, Paperclip, Square, X } from 'lucide-react'
+import { ArrowUp, Plus, Paperclip, Image, FileCode, Square, X } from 'lucide-react'
 import { Button } from '@/app/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/app/components/ui/dropdown-menu'
 import {
   PromptInput,
   PromptInputAction,
@@ -16,8 +22,19 @@ import { Markdown } from '@/app/components/prompt-kit/markdown'
 import { Loader } from '@/app/components/prompt-kit/loader'
 import { ScrollButton } from '@/app/components/prompt-kit/scroll-button'
 import { FeedbackBar } from '@/app/components/prompt-kit/feedback-bar'
+import { PromptSuggestion } from '@/app/components/prompt-kit/prompt-suggestion'
 
-import movesiaLogo from '@/app/assets/Movesia-Logo-Black.svg'
+
+// =============================================================================
+// Suggestions
+// =============================================================================
+
+const SUGGESTIONS = [
+  'Show me the scene hierarchy',
+  'Create a player movement script',
+  'Add a Rigidbody to the Player',
+  'Analyze my project build size',
+]
 
 // =============================================================================
 // Types
@@ -194,7 +211,7 @@ export function ChatScreen () {
       onValueChange={setInput}
       isLoading={isLoading}
       onSubmit={handleSubmit}
-      className='w-full max-w-3xl mx-auto'
+      className='w-full max-w-[740px] mx-auto'
     >
       {files.length > 0 && (
         <div className='flex flex-wrap gap-2 pb-2'>
@@ -216,24 +233,62 @@ export function ChatScreen () {
           ))}
         </div>
       )}
-      <PromptInputTextarea placeholder='Ask me anything...' />
+      <PromptInputTextarea placeholder='Ask me anything...' rows={2} />
+      <input
+        ref={uploadInputRef}
+        type='file'
+        multiple
+        onChange={handleFileChange}
+        className='hidden'
+        id='file-upload'
+      />
       <PromptInputActions className='flex items-center justify-between gap-2 pt-2'>
-        <PromptInputAction tooltip='Attach files'>
-          <label
-            htmlFor='file-upload'
-            className='hover:bg-secondary-foreground/10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-2xl'
-          >
-            <input
-              ref={uploadInputRef}
-              type='file'
-              multiple
-              onChange={handleFileChange}
-              className='hidden'
-              id='file-upload'
-            />
-            <Paperclip className='text-primary size-5' />
-          </label>
-        </PromptInputAction>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type='button'
+              className='flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground'
+              aria-label='Add content'
+            >
+              <Plus className='size-4' />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side='top' align='start' className='min-w-[200px]'>
+            <DropdownMenuItem
+              className='cursor-pointer'
+              onClick={() => uploadInputRef.current?.click()}
+            >
+              <Paperclip className='size-4' />
+              Add from local files
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className='cursor-pointer'
+              onClick={() => {
+                if (uploadInputRef.current) {
+                  uploadInputRef.current.accept = 'image/*'
+                  uploadInputRef.current.click()
+                  uploadInputRef.current.accept = ''
+                }
+              }}
+            >
+              <Image className='size-4' />
+              Add image
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className='cursor-pointer'
+              onClick={() => {
+                if (uploadInputRef.current) {
+                  uploadInputRef.current.accept = '.cs,.json,.yaml,.xml,.txt,.md'
+                  uploadInputRef.current.click()
+                  uploadInputRef.current.accept = ''
+                }
+              }}
+            >
+              <FileCode className='size-4' />
+              Add code file
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Button
           variant='default'
           size='icon'
@@ -250,18 +305,26 @@ export function ChatScreen () {
     </PromptInput>
   )
 
-  // Empty state — logo + input centered in the middle
+  // Empty state
   if (!hasMessages) {
     return (
       <div className='flex flex-col h-full bg-background text-foreground'>
         <div className='flex-1' />
         <div className='flex flex-col items-center px-4 pb-2'>
-          <img src={movesiaLogo} alt='Movesia' className='w-12 h-12 mb-4 opacity-20' />
-          <h2 className='text-lg font-semibold mb-1'>How can I help?</h2>
-          <p className='text-sm text-muted-foreground max-w-md text-center mb-6'>
-            Ask me anything about your Unity project — inspect scenes, create GameObjects, write scripts, and more.
-          </p>
-          <div className='w-full max-w-3xl'>{promptInput}</div>
+          <h1 className='text-4xl font-bold mb-8'>What can I do for you?</h1>
+          <div className='w-full max-w-[740px]'>{promptInput}</div>
+          <div className='flex flex-wrap justify-center gap-2 mt-4 max-w-[740px]'>
+            {SUGGESTIONS.map((suggestion) => (
+              <PromptSuggestion
+                key={suggestion}
+                onClick={() => {
+                  setInput(suggestion)
+                }}
+              >
+                {suggestion}
+              </PromptSuggestion>
+            ))}
+          </div>
         </div>
         <div className='flex-1' />
       </div>
@@ -272,7 +335,7 @@ export function ChatScreen () {
   return (
     <div className='flex flex-col h-full bg-background text-foreground'>
       <ChatContainerRoot className='flex-1'>
-        <ChatContainerContent className='px-4 py-4 max-w-3xl mx-auto w-full space-y-4'>
+        <ChatContainerContent className='px-4 py-4 max-w-[740px] mx-auto w-full space-y-4'>
           {messages.map((msg, index) => {
             const isLastAssistant =
               msg.role === 'assistant' &&

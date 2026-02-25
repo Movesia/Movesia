@@ -105,7 +105,7 @@ function PromptInputTextarea({
     usePromptInput()
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
 
-  // Auto-resize textarea
+  // Auto-resize textarea (respects rows as minimum height)
   React.useEffect(() => {
     const textarea = textareaRef.current
     if (!textarea || disableAutosize) return
@@ -113,7 +113,10 @@ function PromptInputTextarea({
     textarea.style.height = "auto"
     const maxH =
       typeof maxHeight === "number" ? maxHeight : parseInt(maxHeight, 10)
-    textarea.style.height = `${Math.min(textarea.scrollHeight, maxH)}px`
+    const lineHeight = parseFloat(getComputedStyle(textarea).lineHeight) || 20
+    const rows = textarea.rows || 1
+    const minH = lineHeight * rows
+    textarea.style.height = `${Math.max(minH, Math.min(textarea.scrollHeight, maxH))}px`
   }, [value, disableAutosize, maxHeight])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
