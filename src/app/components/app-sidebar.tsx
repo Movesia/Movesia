@@ -35,6 +35,7 @@ import {
 } from '@/app/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/app/components/ui/avatar'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/tooltip'
+import { useLocation } from 'react-router-dom'
 import type { Thread } from '@/app/lib/types/chat'
 
 // =============================================================================
@@ -199,6 +200,7 @@ export function AppSidebar ({
 }: AppSidebarProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const { state: sidebarState, isMobile } = useSidebar()
+  const isSetupScreen = useLocation().pathname === '/'
 
   const userInitials = user.name
     .split(' ')
@@ -258,7 +260,11 @@ export function AppSidebar ({
       </SidebarHeader>
 
       <SidebarContent>
-        {sidebarState === 'expanded' && (
+        {sidebarState === 'expanded' && isSetupScreen ? (
+          <div className='flex flex-1 items-center justify-center px-4'>
+            <p className='text-xs text-sidebar-foreground/50'>Select a project</p>
+          </div>
+        ) : sidebarState === 'expanded' ? (
           <>
             <ThreadGroup
               label='Today'
@@ -291,7 +297,7 @@ export function AppSidebar ({
               </div>
             )}
           </>
-        )}
+        ) : null}
       </SidebarContent>
 
       <SidebarFooter className='border-t border-sidebar-border'>

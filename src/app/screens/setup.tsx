@@ -16,6 +16,8 @@ import {
 import { Button } from '@/app/components/ui/button'
 import { Badge } from '@/app/components/ui/badge'
 import { cn } from '@/app/lib/utils'
+import MovesiaLogo from '@/app/assets/Movesia-Logo-Black.svg?react'
+import UnityLogo from '@/app/assets/unity-logo.svg?react'
 
 // =============================================================================
 // Types
@@ -379,7 +381,7 @@ export function SetupScreen() {
       // Small delay so the user sees all steps completed
       const timeout = setTimeout(() => {
         navigate('/chat')
-      }, 1500)
+      }, 500)
       return () => clearTimeout(timeout)
     }
   }, [allDone, navigate])
@@ -453,7 +455,7 @@ export function SetupScreen() {
 
           {/* Step 2: Install package */}
           <StepCard
-            icon={Package}
+            icon={MovesiaLogo}
             title='Install the Movesia package'
             description={
               packageStatus.installed
@@ -502,7 +504,7 @@ export function SetupScreen() {
 
           {/* Step 3: Open Unity */}
           <StepCard
-            icon={Play}
+            icon={UnityLogo}
             title='Open Unity'
             description={
               unityRunning
@@ -517,8 +519,8 @@ export function SetupScreen() {
                   Waiting
                 </Badge>
               ) : selectedProject && packageStatus.installed && unityRunning ? (
-                <Badge variant='outline' className='text-[10px] gap-1 border-primary/30 text-primary'>
-                  <span className='size-1.5 rounded-full bg-primary' />
+                <Badge variant='outline' className='text-[10px] gap-1 border-green-500/30 text-green-600'>
+                  <span className='size-1.5 rounded-full bg-green-500' />
                   Running
                 </Badge>
               ) : undefined
@@ -551,13 +553,6 @@ export function SetupScreen() {
           />
         </div>
 
-        {/* Redirecting indicator */}
-        {allDone && (
-          <div className='mt-6 flex items-center justify-center gap-2 text-sm text-primary'>
-            <Loader2 className='size-4 animate-spin' />
-            All set! Redirecting to chat...
-          </div>
-        )}
       </div>
     </div>
   )
