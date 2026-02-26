@@ -245,34 +245,16 @@ export function SetupScreen() {
     try {
       const result = await electron.ipcRenderer.invoke('unity:scan-projects')
       setProjects(result ?? [])
-      return result ?? []
     } catch (err) {
       console.error('Failed to scan projects:', err)
-      return []
     } finally {
       setScanning(false)
     }
   }, [])
 
-  // Scan projects on mount and pre-select the last project if available
+  // Scan projects on mount
   useEffect(() => {
-    let cancelled = false
-    async function init() {
-      const scanned = await scanProjects()
-
-      try {
-        const last = await electron.ipcRenderer.invoke('settings:get-last-project')
-        if (!cancelled && last && !selectedProject) {
-          // Find the matching project in the scanned list, or use the saved one
-          const match = scanned.find((p: UnityProject) => p.path === last.path)
-          setSelectedProject(match ?? { path: last.path, name: last.name, editorVersion: last.editorVersion })
-        }
-      } catch {
-        // No last project — that's fine
-      }
-    }
-    init()
-    return () => { cancelled = true }
+    scanProjects()
   }, [])
 
   // -- Browse for project ---------------------------------------------------
