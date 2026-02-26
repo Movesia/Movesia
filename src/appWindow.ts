@@ -20,8 +20,8 @@ export function createAppWindow (agentService?: AgentService | null): BrowserWin
   const minHeight = 660;
 
   const savedWindowState = windowStateKeeper({
-    defaultWidth: minWidth,
-    defaultHeight: minHeight,
+    defaultWidth: 1200,
+    defaultHeight: 800,
     maximize: false,
   });
 
@@ -42,6 +42,7 @@ export function createAppWindow (agentService?: AgentService | null): BrowserWin
       contextIsolation: true,
       nodeIntegrationInWorker: false,
       nodeIntegrationInSubFrames: false,
+      zoomFactor: 0.9,
       preload: path.join(import.meta.dirname, 'preload.js'),
     },
   };

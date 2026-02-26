@@ -45,17 +45,17 @@ MemoizedBlock.displayName = "MemoizedBlock"
 
 const INITIAL_COMPONENTS: Partial<Components> = {
   h1: ({ children, ...props }) => (
-    <h1 className="mt-6 mb-2 text-2xl font-bold" {...props}>
+    <h1 className="mt-6 mb-4 text-2xl font-bold" {...props}>
       {children}
     </h1>
   ),
   h2: ({ children, ...props }) => (
-    <h2 className="mt-5 mb-2 text-xl font-semibold" {...props}>
+    <h2 className="mt-5 mb-3 text-xl font-semibold" {...props}>
       {children}
     </h2>
   ),
   h3: ({ children, ...props }) => (
-    <h3 className="mt-4 mb-1 text-lg font-semibold" {...props}>
+    <h3 className="mt-4 mb-2 text-lg font-semibold" {...props}>
       {children}
     </h3>
   ),

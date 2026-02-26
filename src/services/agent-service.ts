@@ -448,8 +448,30 @@ export class AgentService {
         version: 'v2',
       })
 
+      let eventCount = 0
+      let deltaCount = 0
+
       for await (const event of eventStream) {
         const kind = event.event
+        eventCount++
+
+        // Log every event type for diagnostics (first 20 + summary)
+        if (eventCount <= 20) {
+          logger.debug(
+            `[Stream] #${eventCount} event="${kind}" name="${event.name ?? ''}"` +
+            (kind === 'on_chat_model_stream'
+              ? ` contentType=${typeof event.data?.chunk?.content} contentLen=${
+                  typeof event.data?.chunk?.content === 'string'
+                    ? event.data.chunk.content.length
+                    : Array.isArray(event.data?.chunk?.content)
+                      ? `array[${event.data.chunk.content.length}]`
+                      : 'n/a'
+                }`
+              : '')
+          )
+        } else if (eventCount === 21) {
+          logger.debug('[Stream] (suppressing further per-event logs)')
+        }
 
         if (kind === 'on_chat_model_stream') {
           const chunk = event.data?.chunk
@@ -457,7 +479,9 @@ export class AgentService {
             const content = chunk.content
 
             if (typeof content === 'string' && content) {
+              deltaCount++
               if (!hasTextContent) {
+                logger.debug(`[Stream] First text-delta at event #${eventCount}, emitting text-start`)
                 onEvent(protocol.textStart())
                 hasTextContent = true
               }
@@ -477,7 +501,9 @@ export class AgentService {
                 }
 
                 if (text) {
+                  deltaCount++
                   if (!hasTextContent) {
+                    logger.debug(`[Stream] First text-delta (array) at event #${eventCount}, emitting text-start`)
                     onEvent(protocol.textStart())
                     hasTextContent = true
                   }
@@ -534,7 +560,7 @@ export class AgentService {
 
       const duration = (Date.now() - startTime) / 1000
       logger.info(
-        `[Chat] Complete: ${toolCallCount} tools in ${duration.toFixed(2)}s`
+        `[Chat] Complete: ${eventCount} events, ${deltaCount} text-deltas, ${toolCallCount} tools in ${duration.toFixed(2)}s`
       )
 
       // Update conversation metadata

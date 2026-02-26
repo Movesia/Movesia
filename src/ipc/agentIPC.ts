@@ -8,6 +8,9 @@
 import { ipcMain, type BrowserWindow } from 'electron';
 import { AgentChannels } from '@/channels/agentChannels';
 import type { AgentService } from '@/services/agent-service';
+import { createLogger } from '@/agent/UnityConnection/config';
+
+const log = createLogger('movesia.ipc');
 
 export function registerAgentIpc(
   mainWindow: BrowserWindow,
@@ -15,16 +18,26 @@ export function registerAgentIpc(
 ): void {
   // ── Chat (streaming) ────────────────────────────────────────────────
   ipcMain.handle(AgentChannels.CHAT_SEND, async (_event, request) => {
+    let ipcEventCount = 0;
+    const ipcStart = Date.now();
+
     try {
       const { threadId } = await agentService.handleChat(request, (event) => {
+        ipcEventCount++;
+        if (ipcEventCount <= 5 || event.type === 'done' || event.type === 'error') {
+          log.debug(`[IPC→Renderer] #${ipcEventCount} type="${event.type}" destroyed=${mainWindow.isDestroyed()}`);
+        }
         if (!mainWindow.isDestroyed()) {
           mainWindow.webContents.send(AgentChannels.CHAT_STREAM_EVENT, event);
         }
       });
+
+      log.debug(`[IPC] Chat done: ${ipcEventCount} events sent to renderer in ${((Date.now() - ipcStart) / 1000).toFixed(2)}s`);
       return { threadId };
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Unknown error';
+      log.error(`[IPC] Chat error after ${ipcEventCount} events: ${message}`);
       if (!mainWindow.isDestroyed()) {
         mainWindow.webContents.send(AgentChannels.CHAT_STREAM_ERROR, message);
       }
