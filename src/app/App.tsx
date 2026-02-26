@@ -5,9 +5,10 @@ import { SidebarProvider, SidebarInset } from '@/app/components/ui/sidebar';
 import { AppSidebar } from '@/app/components/app-sidebar';
 import type { UserProfile } from '@/app/components/app-sidebar';
 import Titlebar from '@/app/components/titlebar';
-import { useRendererListener } from '@/app/hooks';
+import { useRendererListener, useUnityStatus } from '@/app/hooks';
 import { ChatScreen } from '@/app/screens/chat';
 import { SettingsScreen } from '@/app/screens/settings';
+import { SetupScreen } from '@/app/screens/setup';
 import { MenuChannels } from '@/channels/menuChannels';
 import { useThreads } from '@/app/hooks/useThreads';
 import { useChatState } from '@/app/hooks/useChatState';
@@ -95,9 +96,16 @@ function AppShell () {
     navigate('/settings');
   }, [navigate]);
 
+  const handleSwitchProject = useCallback(() => {
+    navigate('/');
+  }, [navigate]);
+
+  // Shared Unity connection status (polled every 3s)
+  const unityStatus = useUnityStatus();
+
   return (
     <SidebarProvider defaultOpen={false} className='flex-col h-full min-h-0'>
-      <Titlebar />
+      <Titlebar unityStatus={unityStatus} onSwitchProject={handleSwitchProject} />
       <div className='min-h-0 flex-1 flex'>
         <AppSidebar
           threads={threads}
@@ -107,11 +115,13 @@ function AppShell () {
           onNewThread={handleNewThread}
           onDeleteThread={handleDeleteThread}
           onSettings={handleSettings}
+          onSwitchProject={handleSwitchProject}
         />
         <SidebarInset>
           <Routes>
+            <Route path='/' Component={SetupScreen} />
             <Route
-              path='/'
+              path='/chat'
               element={
                 <ChatScreen
                   messages={chatState.messages}

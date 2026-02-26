@@ -28,6 +28,7 @@ import {
   closeDatabase,
   getCheckpointSaver,
 } from '../agent/database/engine'
+import { setLastProject, clearLastProject, lastProjectFromPath } from './app-settings'
 
 // Load .env from app root (silently)
 dotenv.config({ path: join(process.cwd(), '.env') })
@@ -324,7 +325,7 @@ export class AgentService {
 
     return new Promise((resolve, reject) => {
       try {
-        this.wsServer = new WebSocketServer({ port })
+        this.wsServer = new WebSocketServer({ host: '127.0.0.1', port })
 
         this.wsServer.on('listening', () => {
           logger.info(`WebSocket server listening on :${port}`)
@@ -629,6 +630,9 @@ export class AgentService {
     if (!this.wsServer) {
       await this.startWebSocketServer()
     }
+
+    // Persist as last project for auto-reconnect on next launch
+    setLastProject(lastProjectFromPath(newPath))
   }
 
   async clearProjectPath(): Promise<void> {
@@ -638,6 +642,7 @@ export class AgentService {
     const { setUnityProjectPath } = await import('../agent/agent')
     setUnityProjectPath('')
 
+    clearLastProject()
     await this.stopWebSocketServer()
   }
 

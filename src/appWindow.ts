@@ -2,6 +2,7 @@ import path from 'node:path';
 
 import { registerMenuIpc } from '@/ipc/menuIPC';
 import { registerAgentIpc } from '@/ipc/agentIPC';
+import { registerUnityIpc } from '@/ipc/unityIPC';
 import { registerWindowStateChangedEvents } from '@/windowState';
 
 import { BrowserWindow, Menu, app } from 'electron';
@@ -15,7 +16,7 @@ let appWindow: BrowserWindow;
  * Create Application Window
  * @returns { BrowserWindow } Application Window Instance
  */
-export function createAppWindow (agentService?: AgentService | null): BrowserWindow {
+export function createAppWindow (agentService?: AgentService | null, initialRoute?: string): BrowserWindow {
   const minWidth = 960;
   const minHeight = 660;
 
@@ -55,10 +56,16 @@ export function createAppWindow (agentService?: AgentService | null): BrowserWin
   appWindow = new BrowserWindow(windowOptions);
 
   // Load the index.html of the app window.
+  // Append initial route as hash fragment so HashRouter starts at the right screen.
+  const hash = initialRoute ? `#${initialRoute}` : '';
+
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    appWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
+    appWindow.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}${hash}`);
   } else {
-    appWindow.loadFile(path.join(import.meta.dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
+    appWindow.loadFile(
+      path.join(import.meta.dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
+      hash ? { hash } : undefined,
+    );
   }
 
   // Remove native menu — handled by custom React menu in renderer
@@ -93,6 +100,7 @@ function registerMainIPC (agentService?: AgentService | null) {
    */
   registerWindowStateChangedEvents(appWindow);
   registerMenuIpc(appWindow);
+  registerUnityIpc(appWindow);
 
   if (agentService) {
     registerAgentIpc(appWindow, agentService);

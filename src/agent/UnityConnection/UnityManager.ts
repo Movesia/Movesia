@@ -384,12 +384,9 @@ export class UnityManager {
      */
     get isConnected(): boolean {
         if (!this._targetProjectPath) {
-            logger.info(`🔍 [DEBUG] isConnected: false (no _targetProjectPath set)`);
             return false;
         }
-        const hasSession = this._hasActiveSessionSync();
-        logger.info(`🔍 [DEBUG] isConnected: ${hasSession} (targetProjectPath="${this._targetProjectPath}", sessionCount=${this._sessions.size})`);
-        return hasSession;
+        return this._hasActiveSessionSync();
     }
 
     /**

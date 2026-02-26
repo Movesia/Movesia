@@ -19,6 +19,9 @@ export const AgentChannels = {
   // Unity
   UNITY_STATUS: 'unity:status',
   UNITY_SET_PROJECT: 'unity:set-project',
+
+  // Settings
+  SETTINGS_GET_LAST_PROJECT: 'settings:get-last-project',
 } as const;
 
 /** Channels the renderer can invoke/send to the main process */
@@ -29,6 +32,7 @@ export const AGENT_SEND_CHANNELS = [
   AgentChannels.THREAD_MESSAGES,
   AgentChannels.UNITY_STATUS,
   AgentChannels.UNITY_SET_PROJECT,
+  AgentChannels.SETTINGS_GET_LAST_PROJECT,
 ] as const;
 
 /** Channels the main process sends to the renderer (renderer listens on) */

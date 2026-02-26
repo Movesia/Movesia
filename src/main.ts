@@ -4,6 +4,8 @@ import squirrelStartup from 'electron-squirrel-startup';
 
 import { createAppWindow } from './appWindow';
 import { AgentService } from './services/agent-service';
+import { initAppSettings, getLastProject, clearLastProject } from './services/app-settings';
+import { isUnityProject } from './services/unity-project-scanner';
 import { createLogger, LogColors } from './agent/UnityConnection/config';
 
 process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true';
@@ -37,9 +39,13 @@ app.whenReady().then(async () => {
     log.error(`React DevTools failed: ${err}`)
   );
 
+  // Initialize app settings
+  const userDataPath = app.getPath('userData');
+  initAppSettings(userDataPath);
+
   // Initialize agent service
   agentService = new AgentService({
-    storagePath: app.getPath('userData'),
+    storagePath: userDataPath,
   });
 
   try {
@@ -53,7 +59,27 @@ app.whenReady().then(async () => {
     );
   }
 
-  createAppWindow(agentService);
+  // Auto-reconnect to last project if valid
+  let initialRoute: string | undefined;
+  const lastProject = getLastProject();
+  if (lastProject) {
+    const valid = await isUnityProject(lastProject.path);
+    if (valid) {
+      try {
+        await agentService.setProjectPath(lastProject.path);
+        initialRoute = '/chat';
+        log.info(`Auto-reconnected to last project: ${lastProject.name}`);
+      } catch (err) {
+        log.warn(`Failed to auto-reconnect to ${lastProject.name}: ${err instanceof Error ? err.message : err}`);
+        clearLastProject();
+      }
+    } else {
+      log.info(`Last project no longer valid, clearing: ${lastProject.path}`);
+      clearLastProject();
+    }
+  }
+
+  createAppWindow(agentService, initialRoute);
 });
 
 /**

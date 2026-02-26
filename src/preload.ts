@@ -26,6 +26,14 @@ const ALLOWED_SEND_CHANNELS = [
   'threads:messages',
   'unity:status',
   'unity:set-project',
+  // Unity setup channels (renderer → main)
+  'unity:scan-projects',
+  'unity:browse-project',
+  'unity:check-running',
+  'unity:check-package',
+  'unity:install-package',
+  // Settings channels
+  'settings:get-last-project',
 ];
 
 // Channels the main process sends to the renderer (renderer listens on)

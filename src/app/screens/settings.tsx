@@ -622,7 +622,7 @@ export function SettingsScreen () {
       <nav className='w-52 shrink-0 border-r border-border flex flex-col'>
         <div className='p-3'>
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/chat')}
             className='flex items-center gap-2 text-sm font-semibold text-foreground hover:text-primary transition-colors cursor-pointer px-2 py-1.5 -ml-1 rounded-md hover:bg-accent/50'
           >
             <ArrowLeft className='size-4' />

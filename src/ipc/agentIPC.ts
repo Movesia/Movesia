@@ -8,6 +8,8 @@
 import { ipcMain, type BrowserWindow } from 'electron';
 import { AgentChannels } from '@/channels/agentChannels';
 import type { AgentService } from '@/services/agent-service';
+import { getLastProject, clearLastProject } from '@/services/app-settings';
+import { isUnityProject } from '@/services/unity-project-scanner';
 import { createLogger } from '@/agent/UnityConnection/config';
 
 const log = createLogger('movesia.ipc');
@@ -66,4 +68,20 @@ export function registerAgentIpc(
   ipcMain.handle(AgentChannels.UNITY_SET_PROJECT, (_event, path: string) =>
     agentService.setProjectPath(path)
   );
+
+  // ── Settings ─────────────────────────────────────────────────────────
+  ipcMain.handle(AgentChannels.SETTINGS_GET_LAST_PROJECT, async () => {
+    const last = getLastProject();
+    if (!last) return null;
+
+    // Validate the project still exists on disk
+    const valid = await isUnityProject(last.path);
+    if (!valid) {
+      log.info(`[Settings] Last project no longer valid, clearing: ${last.path}`);
+      clearLastProject();
+      return null;
+    }
+
+    return last;
+  });
 }

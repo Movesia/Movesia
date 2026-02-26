@@ -3,7 +3,7 @@ import { cn } from '@/app/lib/utils'
 /** Unity connection states */
 export type ConnectionState = 'connected' | 'compiling' | 'disconnected' | 'error'
 
-function UnityLogo({ className }: { className?: string }) {
+export function UnityLogo({ className }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 1488 1681"
@@ -30,7 +30,7 @@ const statusAnimation: Record<ConnectionState, string> = {
   error: '',
 }
 
-const statusTooltip: Record<ConnectionState, string> = {
+export const statusTooltip: Record<ConnectionState, string> = {
   connected: 'Unity connected',
   compiling: 'Unity compiling...',
   disconnected: 'Unity disconnected',

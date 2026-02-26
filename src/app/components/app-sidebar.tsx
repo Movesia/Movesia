@@ -7,6 +7,7 @@ import {
   Settings,
   LogOut,
   User,
+  ArrowLeftRight,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -56,6 +57,7 @@ interface AppSidebarProps {
   onSettings?: () => void
   onProfile?: () => void
   onSignOut?: () => void
+  onSwitchProject?: () => void
 }
 
 // =============================================================================
@@ -193,6 +195,7 @@ export function AppSidebar ({
   onSettings,
   onProfile,
   onSignOut,
+  onSwitchProject,
 }: AppSidebarProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const { state: sidebarState, isMobile } = useSidebar()
@@ -217,14 +220,24 @@ export function AppSidebar ({
   return (
     <Sidebar collapsible='icon'>
       <SidebarHeader>
-        {/* New Chat button */}
         <SidebarMenu>
+          {/* New Chat — always visible (icon when collapsed) */}
           <SidebarMenuItem>
-            <SidebarMenuButton onClick={onNewThread} tooltip='New Chat'>
+            <SidebarMenuButton onClick={onNewThread} tooltip='New Chat' className='cursor-pointer'>
               <Plus className='shrink-0' />
               <span>New Chat</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
+
+          {/* Switch Project — only when expanded */}
+          {sidebarState === 'expanded' && (
+            <SidebarMenuItem>
+              <SidebarMenuButton onClick={onSwitchProject} tooltip='Switch Project' className='cursor-pointer'>
+                <ArrowLeftRight className='shrink-0' />
+                <span>Switch Project</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
         </SidebarMenu>
 
         {/* Search (hidden when collapsed to icons) */}
