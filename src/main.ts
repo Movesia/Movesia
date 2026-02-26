@@ -3,6 +3,8 @@ import installExtension, { REACT_DEVELOPER_TOOLS } from 'electron-devtools-insta
 import squirrelStartup from 'electron-squirrel-startup';
 
 import { createAppWindow } from './appWindow';
+import { AgentService } from './services/agent-service';
+import { createLogger, LogColors } from './agent/UnityConnection/config';
 
 process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true';
 
@@ -11,18 +13,48 @@ if (squirrelStartup) {
   app.quit();
 }
 
-app.whenReady().then(() => {
-  installExtension(REACT_DEVELOPER_TOOLS)
-    .then((extension) => console.info(`Added Extension:  ${extension.name}`))
-    .catch((err) => console.info('An error occurred: ', err));
-});
+const log = createLogger('movesia');
 
-/**
- * This method will be called when Electron has finished
- * initialization and is ready to create browser windows.
- * Some APIs can only be used after this event occurs.
- */
-app.on('ready', createAppWindow);
+// Global agent service instance
+let agentService: AgentService | null = null;
+
+app.whenReady().then(async () => {
+  const startTime = Date.now();
+
+  // Startup banner
+  const version = app.getVersion();
+  const banner = `─── Movesia v${version} ───`;
+  if (process.stdout.isTTY) {
+    console.log(
+      `\n${LogColors.BRIGHT_CYAN}${LogColors.BOLD}  🚀 ${banner}${LogColors.RESET}\n`
+    );
+  } else {
+    console.log(`\n  🚀 ${banner}\n`);
+  }
+
+  // React DevTools (suppress success log, keep errors)
+  installExtension(REACT_DEVELOPER_TOOLS).catch((err) =>
+    log.error(`React DevTools failed: ${err}`)
+  );
+
+  // Initialize agent service
+  agentService = new AgentService({
+    storagePath: app.getPath('userData'),
+  });
+
+  try {
+    await agentService.initialize();
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    log.info(`Ready (${elapsed}s)`);
+  } catch (err) {
+    log.error(
+      `Agent service failed to initialize: ${err instanceof Error ? err.message : err}`,
+      err instanceof Error ? err : undefined
+    );
+  }
+
+  createAppWindow(agentService);
+});
 
 /**
  * Emitted when the application is activated. Various actions can
@@ -31,12 +63,8 @@ app.on('ready', createAppWindow);
  * or clicking on the application's dock or taskbar icon.
  */
 app.on('activate', () => {
-  /**
-   * On OS X it's common to re-create a window in the app when the
-   * dock icon is clicked and there are no other windows open.
-   */
   if (BrowserWindow.getAllWindows().length === 0) {
-    createAppWindow();
+    createAppWindow(agentService);
   }
 });
 
@@ -44,16 +72,17 @@ app.on('activate', () => {
  * Emitted when all windows have been closed.
  */
 app.on('window-all-closed', () => {
-  /**
-   * On OS X it is common for applications and their menu bar
-   * to stay active until the user quits explicitly with Cmd + Q
-   */
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
 
 /**
- * In this file you can include the rest of your app's specific main process code.
- * You can also put them in separate files and import them here.
+ * Shutdown agent service before quitting.
  */
+app.on('before-quit', async () => {
+  if (agentService) {
+    await agentService.shutdown();
+    agentService = null;
+  }
+});

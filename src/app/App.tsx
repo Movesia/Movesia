@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { ThemeProvider } from '@/app/components/theme-provider';
 import { TooltipProvider } from '@/app/components/ui/tooltip';
 import { SidebarProvider, SidebarInset } from '@/app/components/ui/sidebar';
@@ -9,7 +9,9 @@ import { useRendererListener } from '@/app/hooks';
 import { ChatScreen } from '@/app/screens/chat';
 import { SettingsScreen } from '@/app/screens/settings';
 import { MenuChannels } from '@/channels/menuChannels';
-import type { Thread } from '@/app/lib/types/chat';
+import { useThreads } from '@/app/hooks/useThreads';
+import { useChatState } from '@/app/hooks/useChatState';
+import type { ChatMessage } from '@/app/hooks/useChatState';
 
 import { Route, HashRouter as Router, Routes, useNavigate } from 'react-router-dom';
 
@@ -23,50 +25,71 @@ const MOCK_USER: UserProfile = {
   email: 'john@movesia.dev',
 };
 
-// Mock threads for development — will be replaced with IPC-backed data
-const INITIAL_THREADS: Thread[] = [
-  // Today
-  { id: '1', title: 'Show me the scene hierarchy for the main dungeon level', createdAt: new Date(), messageCount: 4, projectName: 'Dungeon Crawler', projectVersion: '6000.0.32f1' },
-  { id: '2', title: 'Create player movement script with wall sliding', createdAt: new Date(Date.now() - 1800000), messageCount: 6, projectName: 'Dungeon Crawler', projectVersion: '6000.0.32f1' },
-  { id: '3', title: 'Implement shadcn sidebar component for the app', createdAt: new Date(Date.now() - 3600000), messageCount: 12, projectName: 'Movesia', projectVersion: '6000.0.32f1' },
-  { id: '4', title: 'Fix sidebar component dependency issues and rebuild', createdAt: new Date(Date.now() - 7200000), messageCount: 8, projectName: 'Movesia', projectVersion: '6000.0.32f1' },
-  { id: '5', title: 'Analyze app and review chat UI settings panel', createdAt: new Date(Date.now() - 10800000), messageCount: 5, projectName: 'Dungeon Crawler', projectVersion: '6000.0.32f1' },
-  // Yesterday
-  { id: '6', title: 'Fix missing references in EnemySpawner prefab', createdAt: new Date(Date.now() - 86400000), messageCount: 3, projectName: 'Space Shooter', projectVersion: '6000.0.28f1' },
-  { id: '7', title: 'Set up ProBuilder for level design workflow', createdAt: new Date(Date.now() - 90000000), messageCount: 9, projectName: 'Dungeon Crawler', projectVersion: '6000.0.32f1' },
-  { id: '8', title: 'Debug physics collisions on moving platforms', createdAt: new Date(Date.now() - 100000000), messageCount: 15, projectName: 'Space Shooter', projectVersion: '6000.0.28f1' },
-  { id: '9', title: 'Create enemy AI patrol system with waypoints', createdAt: new Date(Date.now() - 110000000), messageCount: 11, projectName: 'Dungeon Crawler', projectVersion: '6000.0.32f1' },
-  // Older
-  { id: '10', title: 'Analyze project build size and optimize textures', createdAt: new Date(Date.now() - 172800000), messageCount: 2, projectName: 'Space Shooter', projectVersion: '6000.0.28f1' },
-  { id: '11', title: 'Configure post-processing volume for underwater scene', createdAt: new Date(Date.now() - 259200000), messageCount: 7, projectName: 'Ocean Explorer', projectVersion: '6000.0.30f1' },
-  { id: '12', title: 'Add inventory system with drag and drop UI', createdAt: new Date(Date.now() - 345600000), messageCount: 20, projectName: 'Dungeon Crawler', projectVersion: '6000.0.32f1' },
-  { id: '13', title: 'Set up multiplayer networking with Unity Transport', createdAt: new Date(Date.now() - 432000000), messageCount: 14, projectName: 'Space Shooter', projectVersion: '6000.0.28f1' },
-  { id: '14', title: 'Optimize shader performance for mobile build target', createdAt: new Date(Date.now() - 518400000), messageCount: 6, projectName: 'Ocean Explorer', projectVersion: '6000.0.30f1' },
-  { id: '15', title: 'Create save and load system with JSON serialization', createdAt: new Date(Date.now() - 604800000), messageCount: 10, projectName: 'Dungeon Crawler', projectVersion: '6000.0.32f1' },
-];
-
 function AppShell () {
   const navigate = useNavigate();
   useRendererListener(MenuChannels.MENU_EVENT, onMenuEvent);
 
-  const [threads, setThreads] = useState<Thread[]>(INITIAL_THREADS);
-  const [currentThreadId, setCurrentThreadId] = useState<string | null>('1');
+  // Thread management (database-backed)
+  const {
+    threads,
+    currentThreadId,
+    setCurrentThreadId,
+    createThread,
+    deleteThread,
+    loadThreadMessages,
+    refreshThreads,
+  } = useThreads();
+
+  // Chat state (IPC-backed streaming)
+  const chatState = useChatState();
+
+  // Sync thread selection with chat state
+  const handleSelectThread = useCallback(
+    async (threadId: string) => {
+      setCurrentThreadId(threadId);
+      chatState.setThreadId(threadId);
+
+      try {
+        const dbMessages = await loadThreadMessages(threadId);
+        if (Array.isArray(dbMessages)) {
+          const mapped: ChatMessage[] = dbMessages.map((m, i) => ({
+            id: `loaded_${i}_${Date.now()}`,
+            role: m.role as 'user' | 'assistant',
+            content: m.content,
+          }));
+          chatState.setMessages(mapped);
+        }
+      } catch (err) {
+        console.error('[App] Failed to load thread messages:', err);
+        chatState.setMessages([]);
+      }
+    },
+    [setCurrentThreadId, chatState, loadThreadMessages]
+  );
 
   const handleNewThread = useCallback(() => {
-    const newThread: Thread = {
-      id: `thread-${Date.now()}`,
-      title: 'New Chat',
-      createdAt: new Date(),
-      messageCount: 0,
-    };
-    setThreads((prev) => [newThread, ...prev]);
-    setCurrentThreadId(newThread.id);
-  }, []);
+    const newId = createThread();
+    chatState.setThreadId(newId);
+    chatState.setMessages([]);
+  }, [createThread, chatState]);
 
-  const handleDeleteThread = useCallback((threadId: string) => {
-    setThreads((prev) => prev.filter((t) => t.id !== threadId));
-    setCurrentThreadId((prev) => (prev === threadId ? null : prev));
-  }, []);
+  const handleDeleteThread = useCallback(
+    async (threadId: string) => {
+      await deleteThread(threadId);
+      if (currentThreadId === threadId) {
+        chatState.setThreadId(null);
+        chatState.setMessages([]);
+      }
+    },
+    [deleteThread, currentThreadId, chatState]
+  );
+
+  // Refresh thread list when a chat stream completes (to pick up auto-generated title)
+  useEffect(() => {
+    if (chatState.status === 'ready' && chatState.threadId) {
+      refreshThreads();
+    }
+  }, [chatState.status, chatState.threadId, refreshThreads]);
 
   const handleSettings = useCallback(() => {
     navigate('/settings');
@@ -80,14 +103,25 @@ function AppShell () {
           threads={threads}
           currentThreadId={currentThreadId}
           user={MOCK_USER}
-          onSelectThread={setCurrentThreadId}
+          onSelectThread={handleSelectThread}
           onNewThread={handleNewThread}
           onDeleteThread={handleDeleteThread}
           onSettings={handleSettings}
         />
         <SidebarInset>
           <Routes>
-            <Route path='/' Component={ChatScreen} />
+            <Route
+              path='/'
+              element={
+                <ChatScreen
+                  messages={chatState.messages}
+                  isLoading={chatState.isLoading}
+                  status={chatState.status}
+                  error={chatState.error}
+                  onSendMessage={chatState.sendMessage}
+                />
+              }
+            />
             <Route path='/settings' Component={SettingsScreen} />
           </Routes>
         </SidebarInset>

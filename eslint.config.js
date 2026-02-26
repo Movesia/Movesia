@@ -49,6 +49,13 @@ export default [
 
       // Relax import ordering — not worth blocking on
       'import-x/order': 'off',
+      'import-x/first': 'off',
+
+      // Relax rules for migrated agent code (snake_case API contracts, unused prefixed vars)
+      'camelcase': 'off',
+      'no-void': 'off',
+      '@stylistic/quote-props': 'off',
+      'react/jsx-handler-names': 'off',
 
       // Relax other noisy rules
       'no-unused-vars': 'off',

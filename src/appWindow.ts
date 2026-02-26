@@ -1,10 +1,13 @@
 import path from 'node:path';
 
 import { registerMenuIpc } from '@/ipc/menuIPC';
+import { registerAgentIpc } from '@/ipc/agentIPC';
 import { registerWindowStateChangedEvents } from '@/windowState';
 
 import { BrowserWindow, Menu, app } from 'electron';
 import windowStateKeeper from 'electron-window-state';
+
+import type { AgentService } from '@/services/agent-service';
 
 let appWindow: BrowserWindow;
 
@@ -12,7 +15,7 @@ let appWindow: BrowserWindow;
  * Create Application Window
  * @returns { BrowserWindow } Application Window Instance
  */
-export function createAppWindow (): BrowserWindow {
+export function createAppWindow (agentService?: AgentService | null): BrowserWindow {
   const minWidth = 960;
   const minHeight = 660;
 
@@ -66,7 +69,7 @@ export function createAppWindow (): BrowserWindow {
   });
 
   // Register Inter Process Communication for main process
-  registerMainIPC();
+  registerMainIPC(agentService);
 
   savedWindowState.manage(appWindow);
 
@@ -82,11 +85,15 @@ export function createAppWindow (): BrowserWindow {
 /**
  * Register Inter Process Communication
  */
-function registerMainIPC () {
+function registerMainIPC (agentService?: AgentService | null) {
   /**
    * Here you can assign IPC related codes for the application window
    * to Communicate asynchronously from the main process to renderer processes.
    */
   registerWindowStateChangedEvents(appWindow);
   registerMenuIpc(appWindow);
+
+  if (agentService) {
+    registerAgentIpc(appWindow, agentService);
+  }
 }

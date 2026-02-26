@@ -1,0 +1,38 @@
+/**
+ * IPC channel constants for agent communication.
+ *
+ * Channels are split into:
+ * - Send channels: renderer → main (used by invoke/send)
+ * - Receive channels: main → renderer (used by webContents.send, listened via on)
+ */
+export const AgentChannels = {
+  // Chat
+  CHAT_SEND: 'chat:send',
+  CHAT_STREAM_EVENT: 'chat:stream-event',
+  CHAT_STREAM_ERROR: 'chat:stream-error',
+
+  // Threads
+  THREADS_LIST: 'threads:list',
+  THREADS_DELETE: 'threads:delete',
+  THREAD_MESSAGES: 'threads:messages',
+
+  // Unity
+  UNITY_STATUS: 'unity:status',
+  UNITY_SET_PROJECT: 'unity:set-project',
+} as const;
+
+/** Channels the renderer can invoke/send to the main process */
+export const AGENT_SEND_CHANNELS = [
+  AgentChannels.CHAT_SEND,
+  AgentChannels.THREADS_LIST,
+  AgentChannels.THREADS_DELETE,
+  AgentChannels.THREAD_MESSAGES,
+  AgentChannels.UNITY_STATUS,
+  AgentChannels.UNITY_SET_PROJECT,
+] as const;
+
+/** Channels the main process sends to the renderer (renderer listens on) */
+export const AGENT_RECEIVE_CHANNELS = [
+  AgentChannels.CHAT_STREAM_EVENT,
+  AgentChannels.CHAT_STREAM_ERROR,
+] as const;

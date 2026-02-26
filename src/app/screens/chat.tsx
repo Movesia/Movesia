@@ -22,6 +22,7 @@ import { Loader } from '@/app/components/prompt-kit/loader'
 import { ScrollButton } from '@/app/components/prompt-kit/scroll-button'
 import { FeedbackBar } from '@/app/components/prompt-kit/feedback-bar'
 import { PromptSuggestion } from '@/app/components/prompt-kit/prompt-suggestion'
+import type { ChatMessage, ChatStatus } from '@/app/hooks/useChatState'
 
 // =============================================================================
 // Suggestions
@@ -34,126 +35,23 @@ const SUGGESTIONS = [
 ]
 
 // =============================================================================
-// Types
+// Props
 // =============================================================================
 
-interface ChatMessage {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
+interface ChatScreenProps {
+  messages: ChatMessage[]
+  isLoading: boolean
+  status: ChatStatus
+  error: Error | null
+  onSendMessage: (content: string) => void
 }
-
-// =============================================================================
-// Mock responses — cycle through to demo different markdown features
-// =============================================================================
-
-const MOCK_RESPONSES = [
-  `I'll query the Unity Editor to get the current scene hierarchy for you.
-
-Here's what I found in your active scene **SampleScene**:
-
-- **Main Camera** — Camera, AudioListener
-- **Directional Light** — Light
-- **Player** — Rigidbody, CapsuleCollider, PlayerController
-  - **PlayerModel** — MeshRenderer, MeshFilter
-  - **GroundCheck** — (empty)
-- **Environment**
-  - **Ground** — MeshRenderer, BoxCollider
-  - **Wall_01** — MeshRenderer, BoxCollider
-
-The scene has a basic setup with a player character and some environment geometry. Would you like me to inspect any specific GameObject or make changes?`,
-
-  `## Player Movement Script
-
-Here's a basic movement script for your player character using Unity 6's input system:
-
-\`\`\`csharp
-using UnityEngine;
-
-public class PlayerMovement : MonoBehaviour
-{
-    [SerializeField] private float moveSpeed = 5f;
-    [SerializeField] private float jumpForce = 8f;
-
-    private Rigidbody rb;
-    private bool isGrounded;
-
-    void Start()
-    {
-        rb = GetComponent<Rigidbody>();
-    }
-
-    void Update()
-    {
-        float horizontal = Input.GetAxisRaw("Horizontal");
-        float vertical = Input.GetAxisRaw("Vertical");
-
-        Vector3 direction = new Vector3(horizontal, 0f, vertical).normalized;
-        rb.linearVelocity = new Vector3(
-            direction.x * moveSpeed,
-            rb.linearVelocity.y,
-            direction.z * moveSpeed
-        );
-
-        if (Input.GetKeyDown(KeyCode.Space) && isGrounded)
-        {
-            rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
-        }
-    }
-}
-\`\`\`
-
-### Key things to note:
-
-1. Uses \`rb.linearVelocity\` instead of the deprecated \`rb.velocity\` (Unity 6)
-2. The \`[SerializeField]\` attribute exposes private fields in the Inspector
-3. You'll need a **Rigidbody** and **Collider** on the player GameObject
-
-> **Tip:** For production games, consider using Unity's new Input System package instead of the legacy \`Input.GetAxis\` API.
-
-Want me to attach this script to your Player GameObject?`,
-
-  `### Build Report
-
-I've analyzed your project and here are the results:
-
-| Asset Type | Count | Size |
-|-----------|-------|------|
-| Textures | 24 | 48.2 MB |
-| Models | 12 | 15.7 MB |
-| Scripts | 31 | 0.3 MB |
-| Audio | 8 | 22.1 MB |
-| **Total** | **75** | **86.3 MB** |
-
-#### Warnings Found
-
-- ~~Old shader reference in \`Wall_Material\`~~ — already fixed
-- Missing reference in \`EnemySpawner.prefab\` on field \`spawnPoint\`
-- Unused asset: \`Assets/Textures/old_ground_diffuse.png\`
-
-#### Recommended Actions
-
-1. Fix the missing reference in \`EnemySpawner.prefab\`
-2. Delete unused texture to save **4.2 MB**
-3. Consider compressing audio files to reduce build size
-
-The inline code \`Debug.Log("test")\` was found in 3 scripts — you may want to remove those before building.
-
----
-
-Should I fix any of these issues for you?`,
-]
-
-let mockIndex = 0
 
 // =============================================================================
 // ChatScreen
 // =============================================================================
 
-export function ChatScreen () {
+export function ChatScreen ({ messages, isLoading, status, error, onSendMessage }: ChatScreenProps) {
   const [input, setInput] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [files, setFiles] = useState<File[]>([])
   const [feedbackGiven, setFeedbackGiven] = useState<Set<string>>(new Set())
   const uploadInputRef = useRef<HTMLInputElement>(null)
@@ -161,29 +59,10 @@ export function ChatScreen () {
   const handleSubmit = useCallback(() => {
     if ((!input.trim() && files.length === 0) || isLoading) return
 
-    const userMessage: ChatMessage = {
-      id: `msg-${Date.now()}`,
-      role: 'user',
-      content: input.trim(),
-    }
-
-    setMessages((prev) => [...prev, userMessage])
+    onSendMessage(input.trim())
     setInput('')
     setFiles([])
-    setIsLoading(true)
-
-    // Simulate agent response — cycle through mock responses
-    setTimeout(() => {
-      const assistantMessage: ChatMessage = {
-        id: `msg-${Date.now() + 1}`,
-        role: 'assistant',
-        content: MOCK_RESPONSES[mockIndex % MOCK_RESPONSES.length],
-      }
-      mockIndex++
-      setMessages((prev) => [...prev, assistantMessage])
-      setIsLoading(false)
-    }, 1500)
-  }, [input, files, isLoading])
+  }, [input, files, isLoading, onSendMessage])
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
@@ -365,6 +244,13 @@ export function ChatScreen () {
           {isLoading && (
             <div className='py-1'>
               <Loader variant='text-shimmer' size='md' />
+            </div>
+          )}
+
+          {/* Error display */}
+          {error && (
+            <div className='py-2 px-4 bg-destructive/10 text-destructive rounded-lg text-sm'>
+              {error.message}
             </div>
           )}
         </ChatContainerContent>
