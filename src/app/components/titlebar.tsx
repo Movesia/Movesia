@@ -35,7 +35,8 @@ interface TitlebarProps {
 export default function Titlebar ({ unityStatus, onSwitchProject }: TitlebarProps) {
   const [windowState, setWindowState] = useState<WindowState>('normal');
   const location = useLocation();
-  const isSetupScreen = location.pathname === '/';
+  const isSignInScreen = location.pathname === '/';
+  const isSetupScreen = location.pathname === '/setup';
 
   useRendererListener('window-state-changed', (_, windowState: WindowState) => setWindowState(windowState));
 
@@ -49,19 +50,21 @@ export default function Titlebar ({ unityStatus, onSwitchProject }: TitlebarProp
       {__WIN32__ && (
         <>
           <Menu />
-          <section className='flex items-center px-2.5' style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <SidebarTrigger className='size-4' />
-              </TooltipTrigger>
-              <TooltipContent side='bottom'>
-                <p>Toggle Sidebar <kbd className='ml-1 text-[10px] opacity-60'>Ctrl+B</kbd></p>
-              </TooltipContent>
-            </Tooltip>
-          </section>
+          {!isSignInScreen && (
+            <section className='flex items-center px-2.5' style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <SidebarTrigger className='size-4' />
+                </TooltipTrigger>
+                <TooltipContent side='bottom'>
+                  <p>Toggle Sidebar <kbd className='ml-1 text-[10px] opacity-60'>Ctrl+B</kbd></p>
+                </TooltipContent>
+              </Tooltip>
+            </section>
+          )}
 
           {/* Unity connection indicator with dropdown — hidden on setup screen */}
-          {!isSetupScreen && (
+          {!isSetupScreen && !isSignInScreen && (
             <div
               className='absolute right-[138px] top-0 bottom-0 flex items-center'
               style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}

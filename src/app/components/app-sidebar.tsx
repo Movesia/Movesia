@@ -200,7 +200,9 @@ export function AppSidebar ({
 }: AppSidebarProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const { state: sidebarState, isMobile } = useSidebar()
-  const isSetupScreen = useLocation().pathname === '/'
+  const pathname = useLocation().pathname
+  const isSignInScreen = pathname === '/'
+  const isSetupScreen = pathname === '/setup'
 
   const userInitials = user.name
     .split(' ')
@@ -218,6 +220,8 @@ export function AppSidebar ({
   const grouped = useMemo(() => groupThreads(filteredThreads), [filteredThreads])
 
   const hasThreads = filteredThreads.length > 0
+
+  if (isSignInScreen) return null
 
   return (
     <Sidebar collapsible='icon'>

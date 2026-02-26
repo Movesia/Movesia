@@ -9,6 +9,7 @@ import { useRendererListener, useUnityStatus } from '@/app/hooks';
 import { ChatScreen } from '@/app/screens/chat';
 import { SettingsScreen } from '@/app/screens/settings';
 import { SetupScreen } from '@/app/screens/setup';
+import { SignInScreen } from '@/app/screens/signIn';
 import { MenuChannels } from '@/channels/menuChannels';
 import { useThreads } from '@/app/hooks/useThreads';
 import { useChatState } from '@/app/hooks/useChatState';
@@ -97,6 +98,11 @@ function AppShell () {
   }, [navigate]);
 
   const handleSwitchProject = useCallback(() => {
+    navigate('/setup');
+  }, [navigate]);
+
+  // TODO: Replace with real sign-out logic (clear tokens, etc.) — this just navigates for testing
+  const handleSignOut = useCallback(() => {
     navigate('/');
   }, [navigate]);
 
@@ -116,10 +122,12 @@ function AppShell () {
           onDeleteThread={handleDeleteThread}
           onSettings={handleSettings}
           onSwitchProject={handleSwitchProject}
+          onSignOut={handleSignOut}
         />
         <SidebarInset>
           <Routes>
-            <Route path='/' Component={SetupScreen} />
+            <Route path='/' Component={SignInScreen} />
+            <Route path='/setup' Component={SetupScreen} />
             <Route
               path='/chat'
               element={
