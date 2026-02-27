@@ -17,12 +17,14 @@ import type { Database as BetterSqliteDatabase } from 'better-sqlite3';
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite';
 import { createLogger } from '../UnityConnection/config';
 import { CONVERSATIONS_SCHEMA } from './models';
+import { SqliteStore } from './sqlite-store';
 
 const logger = createLogger('movesia.database');
 
 // Global instances (initialized during startup)
 let _db: BetterSqliteDatabase | null = null;
 let _checkpointSaver: SqliteSaver | null = null;
+let _store: SqliteStore | null = null;
 
 // Database path - set from Electron app.getPath('userData')
 let _storagePath: string | null = null;
@@ -109,6 +111,11 @@ export function initDatabase(): BetterSqliteDatabase {
  * Close database connections gracefully.
  */
 export async function closeDatabase(): Promise<void> {
+    if (_store) {
+        _store = null;
+        logger.info('Store reference released');
+    }
+
     if (_checkpointSaver) {
         _checkpointSaver = null;
         logger.info('Checkpointer reference released');
@@ -140,6 +147,18 @@ export function getCheckpointSaver(): SqliteSaver {
         throw new Error('Database not initialized. Call initDatabase() first.');
     }
     return _checkpointSaver;
+}
+
+/**
+ * Get the SQLite-backed BaseStore for persistent key-value storage.
+ * Lazily created on first access using the existing database connection.
+ */
+export function getSqliteStore(): SqliteStore {
+    if (_store === null) {
+        const db = getDatabase(); // throws if not initialized
+        _store = new SqliteStore(db);
+    }
+    return _store;
 }
 
 /**

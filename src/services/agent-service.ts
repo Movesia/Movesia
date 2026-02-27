@@ -27,6 +27,7 @@ import {
   initDatabase,
   closeDatabase,
   getCheckpointSaver,
+  getSqliteStore,
 } from '../agent/database/engine'
 import { setLastProject, clearLastProject, lastProjectFromPath } from './app-settings'
 
@@ -299,8 +300,10 @@ export class AgentService {
 
     // Agent
     const checkpointer = getCheckpointSaver()
+    const store = getSqliteStore()
     this.agent = createMovesiaAgent({
       checkpointer,
+      store,
       unityManager: this.unityManager,
       openRouterApiKey: OPENROUTER_API_KEY,
       tavilyApiKey: TAVILY_API_KEY || undefined,
@@ -634,8 +637,10 @@ export class AgentService {
     // Recreate the agent so middleware (filesystem, etc.) gets the project path.
     // The agent's middleware stack is frozen at creation time, so we must rebuild it.
     const checkpointer = getCheckpointSaver()
+    const store = getSqliteStore()
     this.agent = createMovesiaAgent({
       checkpointer,
+      store,
       unityManager: this.unityManager ?? undefined,
       openRouterApiKey: OPENROUTER_API_KEY,
       tavilyApiKey: TAVILY_API_KEY || undefined,

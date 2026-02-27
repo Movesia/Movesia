@@ -28,6 +28,7 @@ export {
     closeDatabase,
     getDatabase,
     getCheckpointSaver,
+    getSqliteStore,
     getDatabasePath,
     isDatabaseInitialized,
     setStoragePath,

@@ -8,11 +8,13 @@
  * Configuration is passed dynamically rather than read from environment variables.
  */
 
+import { createHash } from 'crypto';
 import { resolve } from 'path';
 import { ChatOpenAI } from '@langchain/openai';
 import { TavilySearch } from '@langchain/tavily';
 import { MemorySaver } from '@langchain/langgraph';
 import type { BaseCheckpointSaver } from '@langchain/langgraph';
+import type { BaseStore } from '@langchain/langgraph-checkpoint';
 import { unityTools, setUnityManager } from './unity-tools/index';
 import { UNITY_AGENT_PROMPT } from './prompts';
 import type { UnityManager } from './UnityConnection/index';
@@ -125,6 +127,16 @@ function getAllTools (tavilyApiKey?: string): any[] {
 // =============================================================================
 
 /**
+ * Generate a stable hash from a project path for namespace scoping.
+ * Normalizes the path (lowercase, forward slashes) so the same project
+ * always maps to the same namespace regardless of OS path format.
+ */
+function projectNamespaceHash (projectPath: string): string {
+  const normalized = projectPath.replace(/\\/g, '/').replace(/\/$/, '').toLowerCase();
+  return createHash('sha256').update(normalized).digest('hex').slice(0, 16);
+}
+
+/**
  * Create the middleware stack for the agent.
  */
 function createMiddlewareStack (projectPath?: string): any[] {
@@ -144,7 +156,9 @@ function createMiddlewareStack (projectPath?: string): any[] {
         backend: (config: any) => {
           return new CompositeBackend(new FilesystemBackend({ rootDir: assetsPath, virtualMode: true }), {
             '/scratch/': new StateBackend(config),
-            ...(config.store ? { '/memories/': new StoreBackend(config) } : {}),
+            ...(config.store
+              ? { '/memories/': new StoreBackend(config, { namespace: ['projects', projectNamespaceHash(projectPath), 'memories'] }) }
+              : {}),
           });
         },
       })
@@ -167,6 +181,7 @@ function createMiddlewareStack (projectPath?: string): any[] {
  */
 export interface CreateAgentOptions {
   checkpointer?: BaseCheckpointSaver;
+  store?: BaseStore;
   unityManager?: UnityManager;
   openRouterApiKey?: string;
   tavilyApiKey?: string;
@@ -180,7 +195,7 @@ export interface CreateAgentOptions {
  * parameter.
  */
 export function createMovesiaAgent (options: CreateAgentOptions = {}) {
-  const { checkpointer = new MemorySaver(), unityManager, openRouterApiKey, tavilyApiKey, projectPath } = options;
+  const { checkpointer = new MemorySaver(), store, unityManager, openRouterApiKey, tavilyApiKey, projectPath } = options;
 
   // Set project path if provided
   if (projectPath) {
@@ -210,6 +225,7 @@ export function createMovesiaAgent (options: CreateAgentOptions = {}) {
   log.debug(`Tools: [${toolNames}]`);
   log.debug(`Middleware: [${middlewareNames}]`);
   log.debug(`Checkpointer: ${checkpointer?.constructor.name ?? 'MemorySaver'}`);
+  log.debug(`Store: ${store?.constructor.name ?? 'none'}`);
   log.debug(`Project: ${projectPath ?? 'none'}`);
 
   // Create the agent
@@ -219,6 +235,7 @@ export function createMovesiaAgent (options: CreateAgentOptions = {}) {
     systemPrompt: UNITY_AGENT_PROMPT,
     middleware,
     checkpointer,
+    store,
   });
 
   log.info('Agent created');

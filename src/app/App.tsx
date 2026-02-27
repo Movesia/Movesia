@@ -124,6 +124,14 @@ function AppShell () {
     }
   }, [chatState.status, chatState.threadId, refreshThreads]);
 
+  // Clear stale chat state when the active project changes
+  useEffect(() => {
+    chatState.setThreadId(null);
+    chatState.setMessages([]);
+    setCurrentThreadId(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unityStatus.projectPath]);
+
   const handleSettings = useCallback(() => {
     navigate('/settings');
   }, [navigate]);

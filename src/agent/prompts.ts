@@ -70,6 +70,12 @@ unity_component(action='modify', game_object_id=-74268, component_type='Transfor
 - Never generate documentation files (.md, README, summaries, guides) unless the user explicitly asks for them.
 - Cite evidence: "Player at position [0, 5, 0] after modification"
 - Be concise—developers are busy
+
+## Virtual Directories
+- \`/scratch/\` — Your scratchpad. Use for drafts, plans, intermediate work. Per-conversation only, lost when thread ends.
+- \`/memories/\` — Persistent project memory. Save learned conventions, patterns, decisions here. Persists across all conversations for this project.
+
+At the start of each conversation, \`ls /memories/\` to recall project context.
 `;
 
 
