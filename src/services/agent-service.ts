@@ -654,7 +654,7 @@ export class AgentService {
     return !!this.config.projectPath
   }
 
-  async listThreads(): Promise<
+  async listThreads(projectPath?: string): Promise<
     Array<{
       session_id: string
       title: string | null
@@ -668,7 +668,9 @@ export class AgentService {
       return []
     }
 
-    const conversations = await this.repository.listAll()
+    const conversations = projectPath
+      ? await this.repository.listByProjectPath(projectPath)
+      : await this.repository.listAll()
     return conversations.map(c => ({
       session_id: c.sessionId,
       title: c.title,

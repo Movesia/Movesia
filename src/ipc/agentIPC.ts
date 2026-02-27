@@ -48,8 +48,8 @@ export function registerAgentIpc(
   });
 
   // ── Threads ─────────────────────────────────────────────────────────
-  ipcMain.handle(AgentChannels.THREADS_LIST, () =>
-    agentService.listThreads()
+  ipcMain.handle(AgentChannels.THREADS_LIST, (_event, projectPath?: string) =>
+    agentService.listThreads(projectPath)
   );
 
   ipcMain.handle(AgentChannels.THREADS_DELETE, (_event, threadId: string) =>

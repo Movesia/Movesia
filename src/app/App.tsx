@@ -51,7 +51,10 @@ function AppShell () {
       }
     : { name: 'User', email: '' };
 
-  // Thread management (database-backed)
+  // Shared Unity connection status (polled every 3s)
+  const unityStatus = useUnityStatus();
+
+  // Thread management (database-backed, filtered by active project)
   const {
     threads,
     currentThreadId,
@@ -60,7 +63,7 @@ function AppShell () {
     deleteThread,
     loadThreadMessages,
     refreshThreads,
-  } = useThreads();
+  } = useThreads(unityStatus.projectPath);
 
   // Chat state (IPC-backed streaming)
   const chatState = useChatState();
@@ -129,9 +132,6 @@ function AppShell () {
       console.error('[App] Sign-out failed:', err);
     }
   }, [signOut, navigate]);
-
-  // Shared Unity connection status (polled every 3s)
-  const unityStatus = useUnityStatus();
 
   // Show loading spinner while auth state is resolving (prevents flash of wrong route)
   if (authLoading) {

@@ -116,6 +116,25 @@ export class ConversationRepository {
     }
 
     /**
+     * List conversations for a specific Unity project path.
+     */
+    async listByProjectPath(
+        projectPath: string,
+        limit: number = 50,
+        offset: number = 0
+    ): Promise<Conversation[]> {
+        const db = getDatabase();
+        const rows = db.prepare(`
+            SELECT * FROM conversations
+            WHERE unity_project_path = ?
+            ORDER BY updated_at DESC
+            LIMIT ? OFFSET ?
+        `).all(projectPath, limit, offset) as Record<string, unknown>[];
+
+        return rows.map(rowToConversation);
+    }
+
+    /**
      * Update conversation title (auto-generated from first user message).
      */
     async updateTitle(sessionId: string, title: string): Promise<void> {

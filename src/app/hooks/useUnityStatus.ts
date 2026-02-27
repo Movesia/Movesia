@@ -4,6 +4,7 @@ import type { ConnectionState } from '@/app/components/chat/UnityStatusIndicator
 export interface UnityStatus {
   connectionState: ConnectionState
   projectName: string | undefined
+  projectPath: string | undefined
 }
 
 /**
@@ -16,6 +17,7 @@ export interface UnityStatus {
 export function useUnityStatus (intervalMs = 3000): UnityStatus {
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected')
   const [projectName, setProjectName] = useState<string | undefined>()
+  const [projectPath, setProjectPath] = useState<string | undefined>()
 
   useEffect(() => {
     let active = true
@@ -34,9 +36,12 @@ export function useUnityStatus (intervalMs = 3000): UnityStatus {
         }
 
         if (status?.projectPath) {
-          const parts = (status.projectPath as string).replace(/\\/g, '/').split('/')
+          const rawPath = status.projectPath as string
+          setProjectPath(rawPath)
+          const parts = rawPath.replace(/\\/g, '/').split('/')
           setProjectName(parts[parts.length - 1] || undefined)
         } else {
+          setProjectPath(undefined)
           setProjectName(undefined)
         }
       } catch {
@@ -49,5 +54,5 @@ export function useUnityStatus (intervalMs = 3000): UnityStatus {
     return () => { active = false; clearInterval(interval) }
   }, [intervalMs])
 
-  return { connectionState, projectName }
+  return { connectionState, projectName, projectPath }
 }

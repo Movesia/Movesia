@@ -50,14 +50,14 @@ export interface UseThreadsReturn {
   refreshThreads: () => Promise<void>
 }
 
-export function useThreads(): UseThreadsReturn {
+export function useThreads(projectPath?: string): UseThreadsReturn {
   const [threads, setThreads] = useState<Thread[]>([])
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null)
 
-  // Load threads from database on mount
+  // Load threads from database on mount and when project changes
   useEffect(() => {
     electron.ipcRenderer
-      .invoke('threads:list')
+      .invoke('threads:list', projectPath)
       .then((dbThreads: DbThread[]) => {
         if (Array.isArray(dbThreads)) {
           setThreads(dbThreads.map(mapDbThreadToThread))
@@ -66,7 +66,7 @@ export function useThreads(): UseThreadsReturn {
       .catch((err: Error) => {
         console.error('[useThreads] Failed to load threads:', err)
       })
-  }, [])
+  }, [projectPath])
 
   // Create new thread (local state — db entry created on first message)
   const createThread = useCallback(() => {
@@ -105,14 +105,14 @@ export function useThreads(): UseThreadsReturn {
   // Refresh threads list from database
   const refreshThreads = useCallback(async () => {
     try {
-      const dbThreads: DbThread[] = await electron.ipcRenderer.invoke('threads:list')
+      const dbThreads: DbThread[] = await electron.ipcRenderer.invoke('threads:list', projectPath)
       if (Array.isArray(dbThreads)) {
         setThreads(dbThreads.map(mapDbThreadToThread))
       }
     } catch (err) {
       console.error('[useThreads] Failed to refresh threads:', err)
     }
-  }, [])
+  }, [projectPath])
 
   return {
     threads,
