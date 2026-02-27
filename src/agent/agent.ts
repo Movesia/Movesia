@@ -14,21 +14,18 @@ import { TavilySearch } from '@langchain/tavily';
 import { MemorySaver } from '@langchain/langgraph';
 import type { BaseCheckpointSaver } from '@langchain/langgraph';
 import { unityTools, setUnityManager } from './unity-tools/index';
-import { probuilderTools } from './subagent-tools/index';
-import { UNITY_AGENT_PROMPT, PROBUILDER_AGENT_PROMPT } from './prompts';
+import { UNITY_AGENT_PROMPT } from './prompts';
 import type { UnityManager } from './UnityConnection/index';
 import { createLogger } from './UnityConnection/config';
 
 import { createAgent, todoListMiddleware } from 'langchain';
 import {
   createFilesystemMiddleware,
-  createSubAgentMiddleware,
   CompositeBackend,
   StateBackend,
   StoreBackend,
   FilesystemBackend,
 } from 'deepagents';
-import type { SubAgent } from 'deepagents';
 
 const log = createLogger('movesia.agent');
 
@@ -93,13 +90,6 @@ export function createModel (apiKey?: string, modelName?: string) {
   });
 }
 
-/**
- * Create a model for subagents (uses a faster/cheaper model).
- */
-export function createSubAgentModel (apiKey?: string) {
-  return createModel(apiKey, 'minimax/minimax-m2.5:nitro');
-}
-
 // =============================================================================
 // TOOLS
 // =============================================================================
@@ -135,20 +125,9 @@ function getAllTools (tavilyApiKey?: string): any[] {
 // =============================================================================
 
 /**
- * ProBuilder subagent definition.
- */
-const probuilderSubagent: SubAgent = {
-  name: 'probuilder-expert',
-  description:
-    'Delegate to this agent for ANY 3D geometry or mesh work: creating shapes (cubes, walls, stairs, arches, cylinders, doors, pipes, tori), editing meshes (extrude, bevel, delete faces, merge), flipping normals to make rooms, assigning materials to specific faces, level prototyping, or any ProBuilder operation. Use when the user mentions: build, create shape, mesh, geometry, wall, room, floor, ceiling, stairs, extrude, bevel, level design, prototype, greybox, or whitebox.',
-  systemPrompt: PROBUILDER_AGENT_PROMPT,
-  tools: probuilderTools as any,
-};
-
-/**
  * Create the middleware stack for the agent.
  */
-function createMiddlewareStack (projectPath?: string, subagentLlm?: any): any[] {
+function createMiddlewareStack (projectPath?: string): any[] {
   const middleware: any[] = [];
   const names: string[] = [];
 
@@ -173,18 +152,6 @@ function createMiddlewareStack (projectPath?: string, subagentLlm?: any): any[] 
     names.push('filesystem');
   } else {
     log.warn('No projectPath — filesystem middleware skipped');
-  }
-
-  // 3. SubAgent middleware
-  if (subagentLlm) {
-    middleware.push(
-      createSubAgentMiddleware({
-        defaultModel: subagentLlm,
-        defaultTools: [],
-        subagents: [probuilderSubagent],
-      })
-    );
-    names.push('subAgent(probuilder)');
   }
 
   log.debug(`Middleware: [${names.join(', ')}]`);
@@ -225,17 +192,16 @@ export function createMovesiaAgent (options: CreateAgentOptions = {}) {
     setUnityManager(unityManager);
   }
 
-  // Create models
+  // Create model
   const llm = createModel(openRouterApiKey);
   const modelName = (llm as any).modelName ?? 'unknown';
-  const subagentLlm = createSubAgentModel(openRouterApiKey);
 
   // Get tools
   const tools = getAllTools(tavilyApiKey);
   const toolNames = tools.map((t: any) => t.name).join(', ');
 
   // Build middleware stack
-  const middleware = createMiddlewareStack(projectPath, subagentLlm);
+  const middleware = createMiddlewareStack(projectPath);
   const middlewareNames = middleware.map((m: any) => m.name || 'anonymous').join(', ');
 
   // Log summary (INFO) + details (DEBUG)

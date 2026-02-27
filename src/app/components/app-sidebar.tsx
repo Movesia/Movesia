@@ -167,7 +167,7 @@ function ThreadMenuItem ({
         onMouseLeave={handleMouseLeave}
       >
         <div className='grid flex-1 text-left leading-tight min-w-0'>
-          <span ref={titleRef} className='overflow-hidden whitespace-nowrap text-base font-semibold fade-text'>
+          <span ref={titleRef} className='overflow-hidden whitespace-nowrap text-sm font-medium fade-text'>
             <span className='inline-block thread-title-inner'>{thread.title}</span>
           </span>
           <span className='overflow-hidden whitespace-nowrap text-[11px] text-sidebar-foreground/50 mt-1'>

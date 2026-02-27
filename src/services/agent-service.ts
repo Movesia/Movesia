@@ -631,6 +631,18 @@ export class AgentService {
       await this.startWebSocketServer()
     }
 
+    // Recreate the agent so middleware (filesystem, etc.) gets the project path.
+    // The agent's middleware stack is frozen at creation time, so we must rebuild it.
+    const checkpointer = getCheckpointSaver()
+    this.agent = createMovesiaAgent({
+      checkpointer,
+      unityManager: this.unityManager ?? undefined,
+      openRouterApiKey: OPENROUTER_API_KEY,
+      tavilyApiKey: TAVILY_API_KEY || undefined,
+      projectPath: newPath,
+    })
+    logger.info('Agent recreated with filesystem middleware')
+
     // Persist as last project for auto-reconnect on next launch
     setLastProject(lastProjectFromPath(newPath))
   }
