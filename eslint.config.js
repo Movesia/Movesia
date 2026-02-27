@@ -1,4 +1,5 @@
 import neo, { resolveIgnoresFromGitignore } from 'neostandard';
+import reactHooks from 'eslint-plugin-react-hooks';
 
 export default [
   ...neo({
@@ -7,7 +8,13 @@ export default [
     ignores: resolveIgnoresFromGitignore()
   }),
   {
+    plugins: {
+      'react-hooks': reactHooks,
+    },
     rules: {
+      // Only enable the standard react-hooks rules (not the stricter React Compiler rules)
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
       // Relax stylistic rules — let Prettier/formatter handle these
       '@stylistic/semi': 'off',
       '@stylistic/jsx-quotes': 'off',

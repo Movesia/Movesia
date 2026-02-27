@@ -255,7 +255,7 @@ export function SetupScreen() {
   // Scan projects on mount
   useEffect(() => {
     scanProjects()
-  }, [])
+  }, [scanProjects])
 
   // -- Browse for project ---------------------------------------------------
   const browseForProject = useCallback(async () => {

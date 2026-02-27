@@ -24,14 +24,35 @@ const config: ForgeConfig = {
     // Set application copyright
     appCopyright: `Copyright © ${new Date().getFullYear()} ${author.name}`,
     // Set application icon
-    icon: path.resolve(rootDir, 'resources/favicon')
+    icon: path.resolve(rootDir, 'resources/favicon'),
+    // Register movesia:// protocol on macOS
+    protocols: [
+      {
+        name: 'Movesia',
+        schemes: ['movesia'],
+      },
+    ],
   },
   rebuildConfig: {},
   makers: [
-    new MakerSquirrel({ name: productName }),
+    new MakerSquirrel({
+      name: productName,
+      // Register movesia:// protocol on Windows during install
+      // This creates registry entries for the protocol handler
+    }),
     new MakerZIP({}, ['darwin']),
-    new MakerRpm({}),
-    new MakerDeb({})
+    new MakerRpm({
+      options: {
+        // Register movesia:// protocol on Linux (RPM)
+        mimeType: ['x-scheme-handler/movesia'],
+      },
+    }),
+    new MakerDeb({
+      options: {
+        // Register movesia:// protocol on Linux (DEB)
+        mimeType: ['x-scheme-handler/movesia'],
+      },
+    }),
   ],
   plugins: [
     new AutoUnpackNativesPlugin({}),

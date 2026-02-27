@@ -48,6 +48,8 @@ const ALLOWED_RECEIVE_CHANNELS = [
   'chat:stream-event',
   'chat:stream-error',
   'auth:state-changed',
+  // Protocol channels (main → renderer)
+  'protocol:url-received',
 ];
 
 const versions: Record<string, unknown> = {};

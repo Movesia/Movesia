@@ -7,6 +7,12 @@ import { AgentService } from './services/agent-service';
 import { AuthService } from './services/auth-service';
 import { initAppSettings, getLastProject, clearLastProject } from './services/app-settings';
 import { isUnityProject } from './services/unity-project-scanner';
+import {
+  registerProtocol,
+  setupProtocolHandlers,
+  requestSingleInstanceLock,
+  setMainWindow,
+} from './services/protocol-handler';
 import { createLogger, LogColors } from './agent/UnityConnection/config';
 
 process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true';
@@ -14,6 +20,23 @@ process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true';
 /** Handle creating/removing shortcuts on Windows when installing/uninstalling. */
 if (squirrelStartup) {
   app.quit();
+}
+
+/**
+ * Register custom protocol (movesia://) BEFORE app is ready.
+ * This allows external apps to open/focus Movesia:
+ *   Unity: Application.OpenURL("movesia://open")
+ */
+registerProtocol();
+setupProtocolHandlers();
+
+/**
+ * Request single instance lock.
+ * If another instance is running, it will receive our argv and focus.
+ */
+if (!requestSingleInstanceLock()) {
+  // Another instance is running, quit this one
+  process.exit(0);
 }
 
 const log = createLogger('movesia');
@@ -92,7 +115,10 @@ app.whenReady().then(async () => {
     }
   }
 
-  createAppWindow(agentService, authService, initialRoute);
+  const window = createAppWindow(agentService, authService, initialRoute);
+
+  // Register window with protocol handler for URL forwarding
+  setMainWindow(window);
 });
 
 /**
