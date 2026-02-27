@@ -81,6 +81,14 @@ function AppShell () {
             id: `loaded_${i}_${Date.now()}`,
             role: m.role as 'user' | 'assistant',
             content: m.content,
+            // Reconstruct toolParts from saved tool_calls (if present)
+            toolParts: m.tool_calls?.map((tc: { id: string; name: string; input: unknown; output: unknown }) => ({
+              type: tc.name,
+              state: 'complete' as const,
+              toolCallId: tc.id,
+              input: tc.input as Record<string, unknown> | undefined,
+              output: tc.output as Record<string, unknown> | undefined,
+            })),
           }));
           chatState.setMessages(mapped);
         }

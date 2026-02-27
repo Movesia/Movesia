@@ -13,6 +13,7 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react'
+import type { ToolPart } from '@/app/components/prompt-kit/tool'
 
 // Debug logging helper
 const DEBUG = true
@@ -36,6 +37,8 @@ export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
   content: string
+  /** Tool invocations associated with this assistant message */
+  toolParts?: ToolPart[]
 }
 
 /** Chat status */
@@ -94,6 +97,8 @@ export function useChatState(options: UseChatStateOptions = {}): UseChatStateRet
   const currentMessageIdRef = useRef<string>('')
   const accumulatedTextRef = useRef<string>('')
   const isStreamingRef = useRef<boolean>(false)
+  // Tool call accumulator: toolCallId → ToolPart
+  const toolCallsRef = useRef<Map<string, ToolPart>>(new Map())
 
   // Listen to stream events from main process
   useEffect(() => {
@@ -104,6 +109,7 @@ export function useChatState(options: UseChatStateOptions = {}): UseChatStateRet
         case 'start':
           currentMessageIdRef.current = (agentEvent.messageId as string) || `msg_${Date.now()}`
           accumulatedTextRef.current = ''
+          toolCallsRef.current = new Map()
           isStreamingRef.current = true
           setStatus('streaming')
           setError(null)
@@ -115,6 +121,7 @@ export function useChatState(options: UseChatStateOptions = {}): UseChatStateRet
               id: currentMessageIdRef.current,
               role: 'assistant',
               content: '',
+              toolParts: [],
             },
           ])
           break
@@ -144,48 +151,96 @@ export function useChatState(options: UseChatStateOptions = {}): UseChatStateRet
         case 'text-end':
           break
 
-        case 'tool-input-start':
+        case 'tool-input-start': {
+          const toolCallId = agentEvent.toolCallId as string
+          const toolName = agentEvent.toolName as string
+          // Create a new ToolPart in "running" state, recording current text offset
+          toolCallsRef.current.set(toolCallId, {
+            type: toolName,
+            state: 'running',
+            toolCallId,
+            textOffsetStart: accumulatedTextRef.current.length,
+          })
+          // Push to message immediately so UI shows spinner
+          setMessages(prev => {
+            const msgs = [...prev]
+            const lastIdx = msgs.length - 1
+            if (lastIdx >= 0 && msgs[lastIdx].role === 'assistant') {
+              msgs[lastIdx] = {
+                ...msgs[lastIdx],
+                toolParts: Array.from(toolCallsRef.current.values()),
+              }
+            }
+            return msgs
+          })
           if (onToolCallEvent) {
             onToolCallEvent(
-              {
-                type: 'tool-start',
-                toolCallId: agentEvent.toolCallId as string,
-                toolName: agentEvent.toolName as string,
-                textLengthAtEvent: accumulatedTextRef.current.length,
-              },
+              { type: 'tool-start', toolCallId, toolName, textLengthAtEvent: accumulatedTextRef.current.length },
               currentMessageIdRef.current
             )
           }
           break
+        }
 
-        case 'tool-input-available':
+        case 'tool-input-available': {
+          const toolCallId = agentEvent.toolCallId as string
+          const toolName = agentEvent.toolName as string
+          const input = agentEvent.input as Record<string, unknown> | undefined
+          const existing = toolCallsRef.current.get(toolCallId)
+          toolCallsRef.current.set(toolCallId, {
+            ...(existing || { type: toolName, state: 'running', toolCallId }),
+            input: input ?? existing?.input,
+          })
+          setMessages(prev => {
+            const msgs = [...prev]
+            const lastIdx = msgs.length - 1
+            if (lastIdx >= 0 && msgs[lastIdx].role === 'assistant') {
+              msgs[lastIdx] = {
+                ...msgs[lastIdx],
+                toolParts: Array.from(toolCallsRef.current.values()),
+              }
+            }
+            return msgs
+          })
           if (onToolCallEvent) {
             onToolCallEvent(
-              {
-                type: 'tool-input',
-                toolCallId: agentEvent.toolCallId as string,
-                toolName: agentEvent.toolName as string,
-                input: agentEvent.input,
-                textLengthAtEvent: accumulatedTextRef.current.length,
-              },
+              { type: 'tool-input', toolCallId, toolName, input, textLengthAtEvent: accumulatedTextRef.current.length },
               currentMessageIdRef.current
             )
           }
           break
+        }
 
-        case 'tool-output-available':
+        case 'tool-output-available': {
+          const toolCallId = agentEvent.toolCallId as string
+          const output = agentEvent.output as Record<string, unknown> | undefined
+          const existing = toolCallsRef.current.get(toolCallId)
+          if (existing) {
+            toolCallsRef.current.set(toolCallId, {
+              ...existing,
+              state: 'complete',
+              output: output ?? undefined,
+            })
+          }
+          setMessages(prev => {
+            const msgs = [...prev]
+            const lastIdx = msgs.length - 1
+            if (lastIdx >= 0 && msgs[lastIdx].role === 'assistant') {
+              msgs[lastIdx] = {
+                ...msgs[lastIdx],
+                toolParts: Array.from(toolCallsRef.current.values()),
+              }
+            }
+            return msgs
+          })
           if (onToolCallEvent) {
             onToolCallEvent(
-              {
-                type: 'tool-output',
-                toolCallId: agentEvent.toolCallId as string,
-                output: agentEvent.output,
-                textLengthAtEvent: accumulatedTextRef.current.length,
-              },
+              { type: 'tool-output', toolCallId, output, textLengthAtEvent: accumulatedTextRef.current.length },
               currentMessageIdRef.current
             )
           }
           break
+        }
 
         case 'finish-step':
           break
@@ -196,6 +251,25 @@ export function useChatState(options: UseChatStateOptions = {}): UseChatStateRet
 
         case 'error': {
           const errorText = (agentEvent.errorText as string) || 'Unknown error'
+          // Mark any running tools as errored
+          for (const [id, tool] of toolCallsRef.current) {
+            if (tool.state === 'running') {
+              toolCallsRef.current.set(id, { ...tool, state: 'error', errorText })
+            }
+          }
+          if (toolCallsRef.current.size > 0) {
+            setMessages(prev => {
+              const msgs = [...prev]
+              const lastIdx = msgs.length - 1
+              if (lastIdx >= 0 && msgs[lastIdx].role === 'assistant') {
+                msgs[lastIdx] = {
+                  ...msgs[lastIdx],
+                  toolParts: Array.from(toolCallsRef.current.values()),
+                }
+              }
+              return msgs
+            })
+          }
           setError(new Error(errorText))
           setStatus('error')
           isStreamingRef.current = false

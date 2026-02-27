@@ -22,7 +22,62 @@ import { Loader } from '@/app/components/prompt-kit/loader'
 import { ScrollButton } from '@/app/components/prompt-kit/scroll-button'
 import { FeedbackBar } from '@/app/components/prompt-kit/feedback-bar'
 import { PromptSuggestion } from '@/app/components/prompt-kit/prompt-suggestion'
+import { Tool } from '@/app/components/prompt-kit/tool'
+import type { ToolPart } from '@/app/components/prompt-kit/tool'
 import type { ChatMessage, ChatStatus } from '@/app/hooks/useChatState'
+
+// =============================================================================
+// Interleaved segment types — text and tools in order
+// =============================================================================
+
+type Segment =
+  | { kind: 'text'; content: string }
+  | { kind: 'tool'; toolPart: ToolPart }
+
+/**
+ * Build interleaved segments from message content + toolParts.
+ * Each toolPart has a textOffsetStart indicating where in the text it was invoked.
+ * We split the text at those offsets and interleave tool cards between text chunks.
+ */
+function buildSegments(content: string, toolParts?: ToolPart[]): Segment[] {
+  if (!toolParts || toolParts.length === 0) {
+    return content ? [{ kind: 'text', content }] : []
+  }
+
+  // Sort tools by their text offset (earliest first)
+  const sorted = [...toolParts].sort(
+    (a, b) => (a.textOffsetStart ?? 0) - (b.textOffsetStart ?? 0)
+  )
+
+  const segments: Segment[] = []
+  let cursor = 0
+
+  for (const tool of sorted) {
+    const offset = tool.textOffsetStart ?? 0
+
+    // Add text before this tool (if any)
+    if (offset > cursor && offset <= content.length) {
+      const textChunk = content.slice(cursor, offset)
+      if (textChunk.trim()) {
+        segments.push({ kind: 'text', content: textChunk })
+      }
+      cursor = offset
+    }
+
+    // Add the tool
+    segments.push({ kind: 'tool', toolPart: tool })
+  }
+
+  // Add remaining text after the last tool
+  if (cursor < content.length) {
+    const remaining = content.slice(cursor)
+    if (remaining.trim()) {
+      segments.push({ kind: 'text', content: remaining })
+    }
+  }
+
+  return segments
+}
 
 // =============================================================================
 // Suggestions
@@ -227,7 +282,18 @@ export function ChatScreen ({ messages, isLoading, status, error, onSendMessage 
               </div>
             ) : (
               <div key={msg.id} className='py-1'>
-                <Markdown id={msg.id}>{msg.content}</Markdown>
+                {(() => {
+                  const segments = buildSegments(msg.content, msg.toolParts)
+                  return segments.map((seg, i) =>
+                    seg.kind === 'text' ? (
+                      <Markdown key={`text-${i}`} id={`${msg.id}-${i}`}>{seg.content}</Markdown>
+                    ) : (
+                      <div key={seg.toolPart.toolCallId || `tool-${i}`} className='my-2'>
+                        <Tool toolPart={seg.toolPart} defaultOpen={false} />
+                      </div>
+                    )
+                  )
+                })()}
                 {isLastAssistant && !feedbackGiven.has(msg.id) && (
                   <div className='mt-2'>
                     <FeedbackBar
