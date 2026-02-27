@@ -4,6 +4,7 @@ import squirrelStartup from 'electron-squirrel-startup';
 
 import { createAppWindow } from './appWindow';
 import { AgentService } from './services/agent-service';
+import { AuthService } from './services/auth-service';
 import { initAppSettings, getLastProject, clearLastProject } from './services/app-settings';
 import { isUnityProject } from './services/unity-project-scanner';
 import { createLogger, LogColors } from './agent/UnityConnection/config';
@@ -17,8 +18,9 @@ if (squirrelStartup) {
 
 const log = createLogger('movesia');
 
-// Global agent service instance
+// Global service instances
 let agentService: AgentService | null = null;
+let authService: AuthService | null = null;
 
 app.whenReady().then(async () => {
   const startTime = Date.now();
@@ -42,6 +44,17 @@ app.whenReady().then(async () => {
   // Initialize app settings
   const userDataPath = app.getPath('userData');
   initAppSettings(userDataPath);
+
+  // Initialize auth service
+  authService = new AuthService();
+  try {
+    await authService.initialize();
+  } catch (err) {
+    log.error(
+      `Auth service failed to initialize: ${err instanceof Error ? err.message : err}`,
+      err instanceof Error ? err : undefined
+    );
+  }
 
   // Initialize agent service
   agentService = new AgentService({
@@ -79,7 +92,7 @@ app.whenReady().then(async () => {
     }
   }
 
-  createAppWindow(agentService, initialRoute);
+  createAppWindow(agentService, authService, initialRoute);
 });
 
 /**
@@ -90,7 +103,7 @@ app.whenReady().then(async () => {
  */
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
-    createAppWindow(agentService);
+    createAppWindow(agentService, authService);
   }
 });
 
@@ -107,6 +120,10 @@ app.on('window-all-closed', () => {
  * Shutdown agent service before quitting.
  */
 app.on('before-quit', async () => {
+  if (authService) {
+    authService.dispose();
+    authService = null;
+  }
   if (agentService) {
     await agentService.shutdown();
     agentService = null;

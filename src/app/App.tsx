@@ -5,7 +5,7 @@ import { SidebarProvider, SidebarInset } from '@/app/components/ui/sidebar';
 import { AppSidebar } from '@/app/components/app-sidebar';
 import type { UserProfile } from '@/app/components/app-sidebar';
 import Titlebar from '@/app/components/titlebar';
-import { useRendererListener, useUnityStatus } from '@/app/hooks';
+import { useRendererListener, useUnityStatus, useAuthState } from '@/app/hooks';
 import { ChatScreen } from '@/app/screens/chat';
 import { SettingsScreen } from '@/app/screens/settings';
 import { SetupScreen } from '@/app/screens/setup';
@@ -15,21 +15,41 @@ import { useThreads } from '@/app/hooks/useThreads';
 import { useChatState } from '@/app/hooks/useChatState';
 import type { ChatMessage } from '@/app/hooks/useChatState';
 
-import { Route, HashRouter as Router, Routes, useNavigate } from 'react-router-dom';
+import { Route, HashRouter as Router, Routes, useNavigate, useLocation } from 'react-router-dom';
 
 const onMenuEvent = (_: Electron.IpcRendererEvent, channel: string, ...args: unknown[]) => {
   electron.ipcRenderer.invoke(channel, args);
 };
 
-// Mock user for development — will be replaced with auth state
-const MOCK_USER: UserProfile = {
-  name: 'John Doe',
-  email: 'john@movesia.dev',
-};
-
 function AppShell () {
   const navigate = useNavigate();
+  const location = useLocation();
   useRendererListener(MenuChannels.MENU_EVENT, onMenuEvent);
+
+  // Auth state (replaces MOCK_USER)
+  const { isAuthenticated, user, isLoading: authLoading, signOut } = useAuthState();
+
+  // Route protection — short-circuit while auth state is loading
+  useEffect(() => {
+    if (authLoading) return;
+
+    if (!isAuthenticated && location.pathname !== '/') {
+      navigate('/', { replace: true });
+    }
+
+    if (isAuthenticated && location.pathname === '/') {
+      navigate('/setup', { replace: true });
+    }
+  }, [isAuthenticated, authLoading, location.pathname, navigate]);
+
+  // Build user profile from auth state for sidebar
+  const userProfile: UserProfile = user
+    ? {
+        name: user.name || user.email || 'User',
+        email: user.email || '',
+        avatar: user.picture,
+      }
+    : { name: 'User', email: '' };
 
   // Thread management (database-backed)
   const {
@@ -101,13 +121,26 @@ function AppShell () {
     navigate('/setup');
   }, [navigate]);
 
-  // TODO: Replace with real sign-out logic (clear tokens, etc.) — this just navigates for testing
-  const handleSignOut = useCallback(() => {
-    navigate('/');
-  }, [navigate]);
+  const handleSignOut = useCallback(async () => {
+    try {
+      await signOut();
+      navigate('/', { replace: true });
+    } catch (err) {
+      console.error('[App] Sign-out failed:', err);
+    }
+  }, [signOut, navigate]);
 
   // Shared Unity connection status (polled every 3s)
   const unityStatus = useUnityStatus();
+
+  // Show loading spinner while auth state is resolving (prevents flash of wrong route)
+  if (authLoading) {
+    return (
+      <div className='flex h-full items-center justify-center'>
+        <div className='h-6 w-6 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent' />
+      </div>
+    );
+  }
 
   return (
     <SidebarProvider defaultOpen={false} className='flex-col h-full min-h-0'>
@@ -116,7 +149,7 @@ function AppShell () {
         <AppSidebar
           threads={threads}
           currentThreadId={currentThreadId}
-          user={MOCK_USER}
+          user={userProfile}
           onSelectThread={handleSelectThread}
           onNewThread={handleNewThread}
           onDeleteThread={handleDeleteThread}

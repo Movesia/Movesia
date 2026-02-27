@@ -34,6 +34,11 @@ const ALLOWED_SEND_CHANNELS = [
   'unity:install-package',
   // Settings channels
   'settings:get-last-project',
+  // Auth channels (renderer → main)
+  'auth:sign-in',
+  'auth:sign-out',
+  'auth:get-state',
+  'auth:get-token',
 ];
 
 // Channels the main process sends to the renderer (renderer listens on)
@@ -42,6 +47,7 @@ const ALLOWED_RECEIVE_CHANNELS = [
   'window-state-changed',
   'chat:stream-event',
   'chat:stream-error',
+  'auth:state-changed',
 ];
 
 const versions: Record<string, unknown> = {};

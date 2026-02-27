@@ -72,7 +72,8 @@ const COMPONENT_STYLES: Record<string, { color: string; icon: string }> = {
     'movesia.router': { color: LogColors.CYAN, icon: '📡' },
     'movesia.transport': { color: LogColors.BRIGHT_BLACK, icon: '📦' },
     'movesia.agent': { color: LogColors.BRIGHT_MAGENTA, icon: '🤖' },
-    'movesia.streaming': { color: LogColors.BRIGHT_BLUE, icon: '⚡' }
+    'movesia.streaming': { color: LogColors.BRIGHT_BLUE, icon: '⚡' },
+    'movesia.auth': { color: LogColors.BRIGHT_YELLOW, icon: '🔐' }
 };
 
 /** Level styles for logging. */

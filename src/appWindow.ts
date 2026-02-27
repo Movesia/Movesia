@@ -2,6 +2,7 @@ import path from 'node:path';
 
 import { registerMenuIpc } from '@/ipc/menuIPC';
 import { registerAgentIpc } from '@/ipc/agentIPC';
+import { registerAuthIpc } from '@/ipc/authIPC';
 import { registerUnityIpc } from '@/ipc/unityIPC';
 import { registerWindowStateChangedEvents } from '@/windowState';
 
@@ -9,6 +10,7 @@ import { BrowserWindow, Menu, app } from 'electron';
 import windowStateKeeper from 'electron-window-state';
 
 import type { AgentService } from '@/services/agent-service';
+import type { AuthService } from '@/services/auth-service';
 
 let appWindow: BrowserWindow;
 
@@ -16,7 +18,7 @@ let appWindow: BrowserWindow;
  * Create Application Window
  * @returns { BrowserWindow } Application Window Instance
  */
-export function createAppWindow (agentService?: AgentService | null, initialRoute?: string): BrowserWindow {
+export function createAppWindow (agentService?: AgentService | null, authService?: AuthService | null, initialRoute?: string): BrowserWindow {
   const minWidth = 960;
   const minHeight = 660;
 
@@ -77,7 +79,7 @@ export function createAppWindow (agentService?: AgentService | null, initialRout
   });
 
   // Register Inter Process Communication for main process
-  registerMainIPC(agentService);
+  registerMainIPC(agentService, authService);
 
   savedWindowState.manage(appWindow);
 
@@ -93,7 +95,7 @@ export function createAppWindow (agentService?: AgentService | null, initialRout
 /**
  * Register Inter Process Communication
  */
-function registerMainIPC (agentService?: AgentService | null) {
+function registerMainIPC (agentService?: AgentService | null, authService?: AuthService | null) {
   /**
    * Here you can assign IPC related codes for the application window
    * to Communicate asynchronously from the main process to renderer processes.
@@ -104,5 +106,9 @@ function registerMainIPC (agentService?: AgentService | null) {
 
   if (agentService) {
     registerAgentIpc(appWindow, agentService);
+  }
+
+  if (authService) {
+    registerAuthIpc(appWindow, authService);
   }
 }
