@@ -13,6 +13,7 @@ interface DbThread {
   session_id: string
   title: string | null
   created_at: string
+  updated_at: string
   unity_project_path?: string | null
   unity_version?: string | null
 }
@@ -23,6 +24,7 @@ function mapDbThreadToThread(row: DbThread): Thread {
     id: row.session_id,
     title: row.title || 'New Chat',
     createdAt: new Date(row.created_at),
+    updatedAt: new Date(row.updated_at || row.created_at),
     messageCount: 0,
     projectName: row.unity_project_path?.split(/[\\/]/).pop() ?? undefined,
     projectVersion: row.unity_version ?? undefined,
@@ -69,10 +71,12 @@ export function useThreads(): UseThreadsReturn {
   // Create new thread (local state — db entry created on first message)
   const createThread = useCallback(() => {
     const newId = `thread_${crypto.randomUUID().replace(/-/g, '')}`
+    const now = new Date()
     const newThread: Thread = {
       id: newId,
       title: 'New Chat',
-      createdAt: new Date(),
+      createdAt: now,
+      updatedAt: now,
       messageCount: 0,
     }
     setThreads(prev => [newThread, ...prev])

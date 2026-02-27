@@ -50,6 +50,8 @@
     "push-release": "git push --follow-tags origin master"
   },
   "dependencies": {
+    "@fontsource-variable/geist": "^5.2.8",
+    "@fontsource-variable/geist-mono": "^5.2.7",
     "@langchain/core": "^1.1.28",
     "@langchain/langgraph": "^1.1.5",
     "@langchain/langgraph-checkpoint-sqlite": "^1.0.1",

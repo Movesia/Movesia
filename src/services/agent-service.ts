@@ -659,6 +659,9 @@ export class AgentService {
       session_id: string
       title: string | null
       created_at: string
+      updated_at: string
+      unity_project_path: string | null
+      unity_version: string | null
     }>
   > {
     if (!this.repository) {
@@ -670,6 +673,9 @@ export class AgentService {
       session_id: c.sessionId,
       title: c.title,
       created_at: c.createdAt.toISOString(),
+      updated_at: c.updatedAt.toISOString(),
+      unity_project_path: c.unityProjectPath,
+      unity_version: c.unityVersion,
     }))
   }
 

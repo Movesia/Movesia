@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useCallback } from 'react'
 import {
   Plus,
   Search,
@@ -62,8 +62,22 @@ interface AppSidebarProps {
 }
 
 // =============================================================================
-// Helpers (reused from ThreadSelector logic)
+// Helpers
 // =============================================================================
+
+function formatRelativeTime (date: Date): string {
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  if (diffMins < 1) return 'Just now'
+  if (diffMins < 60) return `${diffMins}m ago`
+  if (diffHours < 24) return `${diffHours}h ago`
+  if (diffDays < 7) return `${diffDays}d ago`
+  return date.toLocaleDateString()
+}
 
 function groupThreads (threads: Thread[]) {
   const today: Thread[] = []
@@ -102,6 +116,45 @@ function ThreadMenuItem ({
   onSelect: () => void
   onDelete: () => void
 }) {
+  const titleRef = useRef<HTMLSpanElement>(null)
+
+  const handleMouseEnter = useCallback(() => {
+    const el = titleRef.current
+    if (!el) return
+    const overflow = el.scrollWidth - el.clientWidth
+    if (overflow > 0) {
+      el.style.setProperty('--scroll-distance', `-${overflow}px`)
+      el.classList.add('is-overflowing')
+    }
+  }, [])
+
+  const handleMouseLeave = useCallback(() => {
+    const el = titleRef.current
+    if (!el) return
+    const inner = el.querySelector('.thread-title-inner') as HTMLElement | null
+    if (!inner) { el.classList.remove('is-overflowing'); return }
+
+    // Get current animated position and freeze it there
+    const computed = getComputedStyle(inner)
+    const currentTransform = computed.transform // matrix(...)
+    inner.style.animation = 'none'
+    inner.style.transform = currentTransform
+
+    // Force reflow then animate back to start
+    void inner.offsetWidth
+    inner.style.transition = 'transform 0.4s ease-out'
+    inner.style.transform = 'translateX(0)'
+
+    const cleanup = () => {
+      inner.style.animation = ''
+      inner.style.transform = ''
+      inner.style.transition = ''
+      el.classList.remove('is-overflowing')
+      inner.removeEventListener('transitionend', cleanup)
+    }
+    inner.addEventListener('transitionend', cleanup)
+  }, [])
+
   return (
     <SidebarMenuItem>
       <SidebarMenuButton
@@ -109,19 +162,22 @@ function ThreadMenuItem ({
         isActive={isActive}
         tooltip={thread.title}
         size='lg'
-        className='h-auto py-2 cursor-pointer'
+        className='h-auto py-2 cursor-pointer group/thread'
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
         <div className='grid flex-1 text-left leading-tight min-w-0'>
-          <span className='overflow-hidden whitespace-nowrap text-sm font-semibold fade-text'>{thread.title}</span>
-          {thread.projectName && (
-            <span className='overflow-hidden whitespace-nowrap text-[11px] text-sidebar-foreground/50 mt-0.5 fade-text'>
-              {thread.projectName}
-              {thread.projectVersion && ` · ${thread.projectVersion}`}
-            </span>
-          )}
+          <span ref={titleRef} className='overflow-hidden whitespace-nowrap text-base font-semibold fade-text'>
+            <span className='inline-block thread-title-inner'>{thread.title}</span>
+          </span>
+          <span className='overflow-hidden whitespace-nowrap text-[11px] text-sidebar-foreground/50 mt-1'>
+            {thread.messageCount > 0 && `${thread.messageCount} msg${thread.messageCount !== 1 ? 's' : ''}`}
+            {thread.projectName && <>{thread.messageCount > 0 && <span className='mx-1 opacity-40'>·</span>}{thread.projectName}</>}
+            {(thread.messageCount > 0 || thread.projectName) && <span className='mx-1 opacity-40'>·</span>}{formatRelativeTime(thread.updatedAt)}
+          </span>
         </div>
       </SidebarMenuButton>
-      <Tooltip>
+      <Tooltip delayDuration={1000}>
         <TooltipTrigger asChild>
           <SidebarMenuAction
             onClick={(e) => {
@@ -129,14 +185,14 @@ function ThreadMenuItem ({
               onDelete()
             }}
             showOnHover
-            className='size-6 rounded-full bg-sidebar-accent hover:bg-sidebar-accent-foreground/10 hover:text-sidebar-accent-foreground flex items-center justify-center cursor-pointer transition-colors duration-300'
+            className='!top-1/2 !-translate-y-1/2 size-6 rounded-full bg-sidebar-accent hover:bg-sidebar-accent-foreground/10 hover:text-sidebar-accent-foreground flex items-center justify-center cursor-pointer transition-colors duration-300'
           >
             <Trash2 className='size-3' />
             <span className='sr-only'>Delete</span>
           </SidebarMenuAction>
         </TooltipTrigger>
         <TooltipContent side='bottom'>
-          <p>Delete thread</p>
+          <p>Delete</p>
         </TooltipContent>
       </Tooltip>
     </SidebarMenuItem>

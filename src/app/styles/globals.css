@@ -1,3 +1,5 @@
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
@@ -36,9 +38,9 @@
   --sidebar-accent-foreground: oklch(0.22 0.035 265);
   --sidebar-border: oklch(0.92 0.005 260);
   --sidebar-ring: oklch(0.22 0.035 265);
-  --font-sans: Inter, sans-serif;
+  --font-sans: 'Geist Variable', sans-serif;
   --font-serif: Source Serif 4, serif;
-  --font-mono: JetBrains Mono, monospace;
+  --font-mono: 'GeistMono Variable', monospace;
   --radius: 0.625rem;
   --sidebar-width: 24rem;
   --sidebar-width-mobile: 18rem;
@@ -86,9 +88,9 @@
   --sidebar-accent-foreground: oklch(0.8823 0.0571 254.1284);
   --sidebar-border: oklch(0.3715 0 0);
   --sidebar-ring: oklch(0.6231 0.188 259.8145);
-  --font-sans: Inter, sans-serif;
+  --font-sans: 'Geist Variable', sans-serif;
   --font-serif: Source Serif 4, serif;
-  --font-mono: JetBrains Mono, monospace;
+  --font-mono: 'GeistMono Variable', monospace;
   --radius: 0.375rem;
   --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
   --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
@@ -300,6 +302,23 @@
 .fade-text {
   mask-image: linear-gradient(to right, black calc(100% - 0.2rem), transparent);
   -webkit-mask-image: linear-gradient(to right, black calc(100% - 0.2rem), transparent);
+}
+
+/* Scroll long thread title on hover — only when text overflows */
+@keyframes scroll-title {
+  0% { transform: translateX(0); }
+  15% { transform: translateX(0); }
+  85% { transform: translateX(var(--scroll-distance, -40px)); }
+  100% { transform: translateX(var(--scroll-distance, -40px)); }
+}
+
+.is-overflowing {
+  mask-image: none;
+  -webkit-mask-image: none;
+}
+
+.is-overflowing .thread-title-inner {
+  animation: scroll-title 3s ease-in-out infinite alternate;
 }
 
 
