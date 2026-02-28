@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "displayName": "Movesia Package",
   "description": "WebSocket connection client for Unity Editor with automatic reconnection, heartbeat, and exponential backoff.",
-  "unity": "6000.3",
+  "unity": "6000.0",
   "documentationUrl": "https://github.com/YOUR_USERNAME/movesia-connection#readme",
   "changelogUrl": "https://github.com/YOUR_USERNAME/movesia-connection/blob/main/CHANGELOG.md",
   "licensesUrl": "https://github.com/YOUR_USERNAME/movesia-connection/blob/main/LICENSE.md",

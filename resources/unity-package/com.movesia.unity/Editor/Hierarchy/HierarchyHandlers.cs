@@ -64,7 +64,7 @@ internal static class HierarchyHandlers
     {
         int instanceId = body?["instanceId"]?.ToObject<int>() ?? 0;
 
-        var go = EditorUtility.EntityIdToObject(instanceId) as GameObject;
+        var go = EditorUtility.InstanceIDToObject(instanceId) as GameObject;
         if (go == null)
         {
             await MessageRouter.SendResponse(requestId, "error_response", new { error = "GameObject not found", instanceId });
