@@ -28,12 +28,12 @@ export const PrefabSchema = z.object({
         .describe("Path to .prefab file (e.g., 'Assets/Prefabs/Player.prefab')."),
 
     // --- CREATE ASSET / APPLY OVERRIDES ---
-    instance_id: z.number().int().optional()
-        .describe('Scene GameObject instance ID. For create: the GO to save. For apply: the prefab instance.'),
+    path: z.string().optional()
+        .describe('Scene GameObject path (e.g. "/SampleScene/Player"). For create: the GO to save as prefab. For apply: the prefab instance.'),
 
     // --- CREATE ASSET ---
     save_path: z.string().optional()
-        .describe("Where to save new prefab (e.g., 'Assets/Prefabs/NewPrefab.prefab'). Used with instance_id."),
+        .describe("Where to save new prefab (e.g., 'Assets/Prefabs/NewPrefab.prefab'). Used with path."),
 
     // --- INSTANTIATE OPTIONS ---
     position: z.tuple([z.number(), z.number(), z.number()]).optional()
@@ -42,8 +42,8 @@ export const PrefabSchema = z.object({
         .describe('Spawn rotation [x, y, z] in euler angles.'),
     scale: z.tuple([z.number(), z.number(), z.number()]).optional()
         .describe('Spawn scale [x, y, z].'),
-    parent_instance_id: z.number().int().optional()
-        .describe('Parent GameObject instance ID to spawn under.'),
+    parent_path: z.string().optional()
+        .describe('Parent GameObject path to spawn under (e.g. "/SampleScene/Environment").'),
 
     // --- MODIFY ASSET ---
     component_type: z.string().optional()
@@ -65,12 +65,12 @@ async function unityPrefabImpl(input: PrefabInput, _config?: any): Promise<strin
     const {
         prefab_name: prefabName,
         asset_path: assetPath,
-        instance_id: instanceId,
+        path,
         save_path: savePath,
         position,
         rotation,
         scale,
-        parent_instance_id: parentInstanceId,
+        parent_path: parentPath,
         component_type: componentType,
         target_path: targetPath,
         properties
@@ -89,9 +89,9 @@ async function unityPrefabImpl(input: PrefabInput, _config?: any): Promise<strin
         body.assetPath = assetPath;
     }
 
-    // Instance ID (for create asset OR apply overrides)
-    if (instanceId !== undefined) {
-        body.instanceId = instanceId;
+    // Scene GameObject path (for create asset OR apply overrides)
+    if (path !== undefined) {
+        body.path = path;
     }
 
     // Save path (for create asset)
@@ -109,8 +109,8 @@ async function unityPrefabImpl(input: PrefabInput, _config?: any): Promise<strin
     if (scale !== undefined) {
         body.scale = scale;
     }
-    if (parentInstanceId !== undefined) {
-        body.parentInstanceId = parentInstanceId;
+    if (parentPath !== undefined) {
+        body.parentPath = parentPath;
     }
 
     // Modify asset options
@@ -125,15 +125,15 @@ async function unityPrefabImpl(input: PrefabInput, _config?: any): Promise<strin
     }
 
     // Validate: at least one identifying field must be present
-    if (prefabName === undefined && assetPath === undefined && instanceId === undefined) {
+    if (prefabName === undefined && assetPath === undefined && path === undefined) {
         return JSON.stringify({
-            error: "Provide at least one of: prefab_name, asset_path, or instance_id",
+            error: "Provide at least one of: prefab_name, asset_path, or path",
             hint: "See examples below for each operation",
             examples: {
-                instantiate: "unity_prefab({ prefab_name: 'Enemy', position: [0, 1, 0] })",
-                modify: "unity_prefab({ asset_path: 'Assets/Prefabs/Enemy.prefab', component_type: 'Rigidbody', properties: { m_Mass: 5.0 } })",
-                create_and_modify: "unity_prefab({ instance_id: 12345, save_path: 'Assets/Prefabs/New.prefab', component_type: 'Rigidbody', properties: { m_Mass: 5.0 } })",
-                apply: "unity_prefab({ instance_id: 12345 })"
+                instantiate: 'unity_prefab({ prefab_name: "Enemy", position: [0, 1, 0] })',
+                modify: 'unity_prefab({ asset_path: "Assets/Prefabs/Enemy.prefab", component_type: "Rigidbody", properties: { m_Mass: 5.0 } })',
+                create_and_modify: 'unity_prefab({ path: "/SampleScene/Player", save_path: "Assets/Prefabs/Player.prefab", component_type: "Rigidbody", properties: { m_Mass: 5.0 } })',
+                apply: 'unity_prefab({ path: "/SampleScene/Player" })'
             }
         }, null, 2);
     }
@@ -157,8 +157,8 @@ Supports COMPOUND operations — combine any Phase 1 + Phase 2 in one call:
 PHASE 1 (pick one):
 - prefab_name → instantiate by name
 - asset_path (alone) → instantiate by path
-- instance_id + save_path → create prefab from scene GO
-- instance_id (alone) → apply overrides
+- path + save_path → create prefab from scene GameObject
+- path (alone) → apply overrides
 
 PHASE 2 (optional, chains after Phase 1):
 - component_type + properties → modify the prefab asset
@@ -166,11 +166,11 @@ PHASE 2 (optional, chains after Phase 1):
 EXAMPLES:
 Instantiate: unity_prefab({ prefab_name: 'Enemy', position: [0, 1, 0] })
 Modify only: unity_prefab({ asset_path: 'Assets/Prefabs/Enemy.prefab', component_type: 'Rigidbody', properties: { m_Mass: 5.0 } })
-Create + modify: unity_prefab({ instance_id: 123, save_path: 'Assets/Prefabs/Player.prefab', component_type: 'Rigidbody', properties: { m_Mass: 5.0 } })
+Create + modify: unity_prefab({ path: "/SampleScene/Player", save_path: 'Assets/Prefabs/Player.prefab', component_type: 'Rigidbody', properties: { m_Mass: 5.0 } })
 Instantiate + modify: unity_prefab({ prefab_name: 'Enemy', position: [0,1,0], component_type: 'BoxCollider', properties: { m_Size: [2,3,1] } })
 
 Response flags: instantiated, created, modified, applied (multiple can be true)
-Optional spawn fields: position, rotation, scale, parent_instance_id
+Optional spawn fields: position, rotation, scale, parent_path
 Use target_path for nested children (e.g., 'Body/HitBox')`,
     schema: PrefabSchema,
     func: unityPrefabImpl

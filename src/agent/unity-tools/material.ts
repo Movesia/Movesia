@@ -53,8 +53,8 @@ const KeywordsSchema = z.union([
  * Assignment target schema
  */
 const AssignToSchema = z.object({
-    game_object_instance_id: z.number().int()
-        .describe('GameObject instance ID to assign material to (required)'),
+    game_object_path: z.string()
+        .describe('Path to the target GameObject (e.g. "/SampleScene/Player"). Required.'),
     slot_index: z.number().int().default(0)
         .describe('Material slot index (default: 0)')
 }).optional().describe('Assign material to a GameObject Renderer');
@@ -140,7 +140,7 @@ async function unityMaterialImpl(input: MaterialInput, _config?: any): Promise<s
     // Assignment params
     if (assignTo !== undefined) {
         body.assignTo = {
-            gameObjectInstanceId: assignTo.game_object_instance_id,
+            path: assignTo.game_object_path,
             slotIndex: assignTo.slot_index ?? 0
         };
     }
@@ -160,7 +160,7 @@ async function unityMaterialImpl(input: MaterialInput, _config?: any): Promise<s
             if (instanceId === undefined && assetPath === undefined) {
                 return JSON.stringify({
                     error: "For 'modify', provide instance_id OR asset_path to identify the material",
-                    hint: "Use unity_query({ action: 'search_assets', asset_type: 'material' }) to find materials",
+                    hint: "Provide the material asset_path (e.g., 'Assets/Materials/Red.mat')",
                     example: "unity_material({ action: 'modify', asset_path: 'Assets/Materials/Red.mat', properties: { color: [1, 0, 0, 1] } })"
                 }, null, 2);
             }
@@ -177,13 +177,13 @@ async function unityMaterialImpl(input: MaterialInput, _config?: any): Promise<s
             if (instanceId === undefined && assetPath === undefined) {
                 return JSON.stringify({
                     error: "For 'assign', provide instance_id OR asset_path to identify the material",
-                    example: "unity_material({ action: 'assign', asset_path: 'Assets/Materials/Red.mat', assign_to: { game_object_instance_id: 12345 } })"
+                    example: "unity_material({ action: 'assign', asset_path: 'Assets/Materials/Red.mat', assign_to: { game_object_path: '/SampleScene/Player' } })"
                 }, null, 2);
             }
             if (assignTo === undefined) {
                 return JSON.stringify({
                     error: "For 'assign', provide assign_to with the target GameObject",
-                    example: "unity_material({ action: 'assign', asset_path: 'Assets/Materials/Red.mat', assign_to: { game_object_instance_id: 12345, slot_index: 0 } })"
+                    example: "unity_material({ action: 'assign', asset_path: 'Assets/Materials/Red.mat', assign_to: { game_object_path: '/SampleScene/Player', slot_index: 0 } })"
                 }, null, 2);
             }
             break;
@@ -193,7 +193,7 @@ async function unityMaterialImpl(input: MaterialInput, _config?: any): Promise<s
             if (assignTo === undefined) {
                 return JSON.stringify({
                     error: "For 'create_and_assign', provide assign_to with the target GameObject",
-                    example: "unity_material({ action: 'create_and_assign', name: 'BluePlastic', properties: { color: [0, 0, 1, 1] }, assign_to: { game_object_instance_id: 12345 } })"
+                    example: "unity_material({ action: 'create_and_assign', name: 'BluePlastic', properties: { color: [0, 0, 1, 1] }, assign_to: { game_object_path: '/SampleScene/Player' } })"
                 }, null, 2);
             }
             break;
@@ -245,12 +245,12 @@ Modify existing material:
   unity_material({ action: 'modify', asset_path: 'Assets/Materials/RedMetal.mat', properties: { color: [0,0,1,1] } })
 
 Assign material to object:
-  unity_material({ action: 'assign', asset_path: 'Assets/Materials/RedMetal.mat', assign_to: { game_object_instance_id: 12345 } })
+  unity_material({ action: 'assign', asset_path: 'Assets/Materials/RedMetal.mat', assign_to: { game_object_path: "/SampleScene/Player" } })
 
 Create + configure + assign (one shot):
   unity_material({ action: 'create_and_assign', name: 'BluePlastic', shader_name: 'Universal Render Pipeline/Lit',
                    properties: { color: [0,0,1,1], metallic: 0.1, smoothness: 0.8 },
-                   assign_to: { game_object_instance_id: 12345, slot_index: 0 } })`,
+                   assign_to: { game_object_path: "/SampleScene/Player", slot_index: 0 } })`,
     schema: MaterialSchema,
     func: unityMaterialImpl
 });

@@ -1,7 +1,7 @@
 /**
  * THE OBSERVER: unity_query
  * "I need to see what exists."
- * Consumes: get_hierarchy, get_components, get_project_settings, get_logs, search_assets
+ * Consumes: list_children, inspect_gameobject, find_gameobjects, get_project_settings, get_logs
  */
 
 import { z } from 'zod';
@@ -12,30 +12,42 @@ import { callUnityAsync } from './connection';
  * Zod schema for unity_query tool input
  */
 export const QuerySchema = z.object({
-    action: z.enum(['hierarchy', 'inspect_object', 'search_assets', 'get_logs', 'get_settings'])
+    action: z.enum(['list_children', 'inspect_gameobject', 'find_gameobjects', 'get_logs', 'get_settings'])
         .describe('The query type.'),
 
-    // Hierarchy params
-    max_depth: z.number().int().default(5)
-        .describe('Depth for hierarchy traversal.'),
+    // --- list_children & inspect_gameobject params ---
+    path: z.string().optional()
+        .describe('Hierarchy path (e.g. "/SampleScene/Player"). Required for list_children and inspect_gameobject. Use "/" to list all scenes.'),
+    depth: z.number().int().min(1).max(3).optional()
+        .describe("Recursion depth for 'list_children' (1-3, default 1). 1 = direct children only."),
 
-    // Inspect params
-    instance_id: z.number().int().optional()
-        .describe("Required for 'inspect_object'. The GameObject Instance ID."),
+    // --- inspect_gameobject params ---
+    components: z.array(z.string()).optional()
+        .describe("Filter: only return these component types for 'inspect_gameobject'. Omit for all."),
+    detail: z.enum(['full', 'summary']).optional()
+        .describe("'full' (default) = properties included. 'summary' = type names + enabled only. For 'inspect_gameobject'."),
 
-    // Search params
-    search_query: z.string().optional()
-        .describe("Name/Label filter for 'search_assets'."),
-    asset_type: z.string().optional()
-        .describe("Type filter (e.g., 'prefab', 'script') for 'search_assets'."),
+    // --- find_gameobjects params ---
+    name: z.string().optional()
+        .describe("Substring match on GameObject name (case-insensitive). For 'find_gameobjects'."),
+    tag: z.string().optional()
+        .describe("Exact tag match. For 'find_gameobjects'."),
+    layer: z.string().optional()
+        .describe("Layer name match. For 'find_gameobjects'."),
+    component: z.string().optional()
+        .describe("Has a component of this type. For 'find_gameobjects'."),
+    root: z.string().optional()
+        .describe("Scope search to this subtree path. For 'find_gameobjects'."),
+    max_results: z.number().int().optional()
+        .describe("Max results for 'find_gameobjects' (default 25)."),
 
-    // Log params
+    // --- get_logs params ---
     log_filter: z.string().optional()
         .describe("'Error', 'Warning', or 'Exception'."),
     log_count: z.number().int().optional()
         .describe("Max number of recent logs to return. Defaults to 100."),
 
-    // Settings params
+    // --- get_settings params ---
     settings_category: z.string().optional()
         .describe("Settings category (e.g., 'physics', 'player', 'quality').")
 });
@@ -49,10 +61,16 @@ export type QueryInput = z.infer<typeof QuerySchema>;
 async function unityQueryImpl(input: QueryInput, _config?: any): Promise<string> {
     const {
         action,
-        max_depth: maxDepth = 5,
-        instance_id: instanceId,
-        search_query: searchQuery,
-        asset_type: assetType,
+        path,
+        depth,
+        components: componentFilter,
+        detail,
+        name: nameFilter,
+        tag: tagFilter,
+        layer: layerFilter,
+        component: componentTypeFilter,
+        root,
+        max_results: maxResults,
         log_filter: logFilter,
         log_count: logCount,
         settings_category: settingsCategory
@@ -61,27 +79,53 @@ async function unityQueryImpl(input: QueryInput, _config?: any): Promise<string>
     let result;
 
     switch (action) {
-        case 'hierarchy':
-            result = await callUnityAsync('get_hierarchy', { maxDepth });
-            break;
-
-        case 'inspect_object':
-            if (instanceId === undefined) {
+        case 'list_children': {
+            if (!path) {
                 return JSON.stringify({
-                    error: "instance_id is required for 'inspect_object'",
-                    hint: "First use unity_query(action='hierarchy') to find GameObject IDs",
-                    example: "unity_query({ action: 'inspect_object', instance_id: -74268 })"
+                    error: "path is required for 'list_children'",
+                    hint: 'Use "/" to list all scenes, "/SceneName" for root objects',
+                    example: 'unity_query({ action: "list_children", path: "/" })'
                 }, null, 2);
             }
-            result = await callUnityAsync('get_components', { instanceId });
+            const params: Record<string, unknown> = { path };
+            if (depth !== undefined) params.depth = depth;
+            result = await callUnityAsync('list_children', params);
             break;
+        }
 
-        case 'search_assets':
-            result = await callUnityAsync('search_assets', {
-                name: searchQuery,
-                type: assetType
-            });
+        case 'inspect_gameobject': {
+            if (!path) {
+                return JSON.stringify({
+                    error: "path is required for 'inspect_gameobject'",
+                    hint: 'First use list_children to browse the hierarchy and find paths',
+                    example: 'unity_query({ action: "inspect_gameobject", path: "/SampleScene/Player" })'
+                }, null, 2);
+            }
+            const params: Record<string, unknown> = { path };
+            if (componentFilter) params.components = componentFilter;
+            if (detail) params.detail = detail;
+            result = await callUnityAsync('inspect_gameobject', params);
             break;
+        }
+
+        case 'find_gameobjects': {
+            if (!nameFilter && !tagFilter && !layerFilter && !componentTypeFilter) {
+                return JSON.stringify({
+                    error: "At least one filter is required for 'find_gameobjects'",
+                    hint: 'Provide name, tag, layer, or component to search by. All filters are AND-ed.',
+                    example: 'unity_query({ action: "find_gameobjects", name: "Enemy" })'
+                }, null, 2);
+            }
+            const params: Record<string, unknown> = {};
+            if (nameFilter) params.name = nameFilter;
+            if (tagFilter) params.tag = tagFilter;
+            if (layerFilter) params.layer = layerFilter;
+            if (componentTypeFilter) params.component = componentTypeFilter;
+            if (root) params.root = root;
+            if (maxResults !== undefined) params.maxResults = maxResults;
+            result = await callUnityAsync('find_gameobjects', params);
+            break;
+        }
 
         case 'get_logs':
             result = await callUnityAsync('get_logs', { filter: logFilter, limit: logCount });
@@ -92,7 +136,6 @@ async function unityQueryImpl(input: QueryInput, _config?: any): Promise<string>
             break;
 
         default: {
-            // TypeScript exhaustiveness check
             const _exhaustive: never = action;
             result = { error: `Unknown action: ${_exhaustive}` };
         }
@@ -110,11 +153,18 @@ export const unityQuery = new DynamicStructuredTool({
     description: `Read the current state of the Unity Editor. This is the agent's "eyes".
 
 Actions:
-- 'hierarchy': See the scene tree structure.
-- 'inspect_object': Get components and properties of a specific object (Requires instance_id).
-- 'search_assets': Find prefabs, scripts, or assets in the project folders.
+- 'list_children': Browse the hierarchy incrementally (like "ls"). Use path="/" to list scenes, "/SceneName" for root objects. depth 1-3 controls recursion.
+- 'inspect_gameobject': Full detail on one object (like "cat"). Requires path. Use components=["Rigidbody"] to filter. detail="summary" for type names only.
+- 'find_gameobjects': Search by name/tag/layer/component (like "find/grep"). At least one filter required. Use root to scope to a subtree.
+- 'get_logs': Check console for errors, warnings, or logs.
 - 'get_settings': Retrieve specific project settings.
-- 'get_logs': Check console for errors, warnings, or logs.`,
+
+NAVIGATION WORKFLOW:
+1. list_children({ path: "/" }) → see loaded scenes
+2. list_children({ path: "/SampleScene" }) → see root objects with descendantCount
+3. descendantCount < 20 → safe to drill with list_children at depth 2-3
+4. descendantCount > 50 → use find_gameobjects with root scoping instead
+5. inspect_gameobject to read component properties on a specific object`,
     schema: QuerySchema,
     func: unityQueryImpl
 });

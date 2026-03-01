@@ -17,8 +17,8 @@ export const HierarchySchema = z.object({
         .describe('The hierarchy manipulation action.'),
 
     // Target
-    instance_id: z.number().int().optional()
-        .describe('The object to manipulate.'),
+    path: z.string().optional()
+        .describe('Path to the target GameObject (e.g. "/SampleScene/Player"). Required for duplicate/destroy/rename/reparent/move_scene.'),
 
     // Create params
     name: z.string().optional()
@@ -27,10 +27,14 @@ export const HierarchySchema = z.object({
         .describe("Optional primitive (Cube, Sphere, Capsule, Cylinder, Plane, Quad) for 'create'."),
 
     // Positioning
-    parent_id: z.number().int().optional()
-        .describe('Parent ID for create/reparent.'),
+    parent_path: z.string().optional()
+        .describe('Parent GameObject path for create/reparent (e.g. "/SampleScene/Environment").'),
     position: z.tuple([z.number(), z.number(), z.number()]).optional()
         .describe('[x, y, z] for creation.'),
+    rotation: z.tuple([z.number(), z.number(), z.number()]).optional()
+        .describe('[x, y, z] euler angles for creation.'),
+    scale: z.tuple([z.number(), z.number(), z.number()]).optional()
+        .describe('[x, y, z] scale for creation.'),
     target_scene: z.string().optional()
         .describe("Scene name for 'move_scene'.")
 });
@@ -54,11 +58,13 @@ const API_MAP = {
 async function unityHierarchyImpl(input: HierarchyInput, _config?: any): Promise<string> {
     const {
         action,
-        instance_id,
+        path,
         name,
         primitive_type,
-        parent_id,
+        parent_path,
         position,
+        rotation,
+        scale,
         target_scene
     } = input;
 
@@ -68,79 +74,81 @@ async function unityHierarchyImpl(input: HierarchyInput, _config?: any): Promise
         case 'create':
             if (name) params.name = name;
             if (primitive_type) params.primitive = primitive_type;
-            if (parent_id !== undefined) params.parentInstanceId = parent_id;
+            if (parent_path) params.parentPath = parent_path;
             if (position) params.position = position;
+            if (rotation) params.rotation = rotation;
+            if (scale) params.scale = scale;
             break;
 
         case 'duplicate':
-            if (instance_id === undefined) {
+            if (!path) {
                 return JSON.stringify({
-                    error: "instance_id is required for 'duplicate'",
-                    hint: "First use unity_query(action='hierarchy') to find the GameObject ID",
-                    example: "unity_hierarchy({ action: 'duplicate', instance_id: -74268 })"
+                    error: "path is required for 'duplicate'",
+                    hint: "Use unity_query(action='list_children') to browse the hierarchy and find paths",
+                    example: 'unity_hierarchy({ action: "duplicate", path: "/SampleScene/Player" })'
                 }, null, 2);
             }
-            params.instanceId = instance_id;
+            params.path = path;
             break;
 
         case 'destroy':
-            if (instance_id === undefined) {
+            if (!path) {
                 return JSON.stringify({
-                    error: "instance_id is required for 'destroy'",
-                    hint: "First use unity_query(action='hierarchy') to find the GameObject ID",
-                    example: "unity_hierarchy({ action: 'destroy', instance_id: -74268 })"
+                    error: "path is required for 'destroy'",
+                    hint: "Use unity_query(action='list_children') to browse the hierarchy and find paths",
+                    example: 'unity_hierarchy({ action: "destroy", path: "/SampleScene/OldObject" })'
                 }, null, 2);
             }
-            params.instanceId = instance_id;
+            params.path = path;
             break;
 
         case 'rename':
-            if (instance_id === undefined) {
+            if (!path) {
                 return JSON.stringify({
-                    error: "instance_id is required for 'rename'",
-                    hint: "First use unity_query(action='hierarchy') to find the GameObject ID",
-                    example: "unity_hierarchy({ action: 'rename', instance_id: -74268, name: 'NewName' })"
+                    error: "path is required for 'rename'",
+                    hint: "Use unity_query(action='list_children') to browse the hierarchy and find paths",
+                    example: 'unity_hierarchy({ action: "rename", path: "/SampleScene/Player", name: "Hero" })'
                 }, null, 2);
             }
             if (name === undefined) {
                 return JSON.stringify({
                     error: "name is required for 'rename'",
                     hint: "Provide the new name for the GameObject",
-                    example: "unity_hierarchy({ action: 'rename', instance_id: -74268, name: 'Player' })"
+                    example: 'unity_hierarchy({ action: "rename", path: "/SampleScene/Player", name: "Hero" })'
                 }, null, 2);
             }
-            params.instanceId = instance_id;
+            params.path = path;
             params.name = name;
             break;
 
         case 'reparent':
-            if (instance_id === undefined) {
+            if (!path) {
                 return JSON.stringify({
-                    error: "instance_id is required for 'reparent'",
-                    hint: "First use unity_query(action='hierarchy') to find both object IDs",
-                    example: "unity_hierarchy({ action: 'reparent', instance_id: -74268, parent_id: -12345 })"
+                    error: "path is required for 'reparent'",
+                    hint: "Use unity_query(action='list_children') to find both object paths",
+                    example: 'unity_hierarchy({ action: "reparent", path: "/SampleScene/Sword", parent_path: "/SampleScene/Player/Weapons" })'
                 }, null, 2);
             }
-            params.instanceId = instance_id;
-            params.parentInstanceId = parent_id; // undefined means move to root
+            params.path = path;
+            if (parent_path) params.parentPath = parent_path; // undefined means move to root
             break;
 
         case 'move_scene':
-            if (instance_id === undefined) {
+            if (!path) {
                 return JSON.stringify({
-                    error: "instance_id is required for 'move_scene'",
-                    hint: "First use unity_query(action='hierarchy') to find the GameObject ID",
-                    example: "unity_hierarchy({ action: 'move_scene', instance_id: -74268, target_scene: 'Level2' })"
+                    error: "path is required for 'move_scene'",
+                    hint: "Use unity_query(action='list_children') to browse the hierarchy and find paths",
+                    example: 'unity_hierarchy({ action: "move_scene", path: "/SampleScene/SharedUI", target_scene: "UIScene" })'
                 }, null, 2);
             }
             if (target_scene === undefined) {
                 return JSON.stringify({
                     error: "target_scene is required for 'move_scene'",
                     hint: "Provide the name of the destination scene",
-                    example: "unity_hierarchy({ action: 'move_scene', instance_id: -74268, target_scene: 'Level2' })"
+                    example: 'unity_hierarchy({ action: "move_scene", path: "/SampleScene/SharedUI", target_scene: "UIScene" })'
                 }, null, 2);
             }
-            params.instanceId = instance_id;
+            params.path = path;
             params.sceneName = target_scene;
             break;
 
@@ -163,12 +171,14 @@ export const unityHierarchy = new DynamicStructuredTool({
     description: `Manage GameObject structure in the scene hierarchy. This is the "Architect".
 
 Actions:
-- 'create': Make new empty objects or primitives (Cube, Sphere, etc.).
-- 'duplicate': Clone an existing GameObject.
-- 'destroy': Remove objects (Undo supported).
-- 'rename': Change a GameObject's name.
-- 'reparent': Move objects in the hierarchy tree.
-- 'move_scene': Move root objects between loaded scenes.`,
+- 'create': Make new empty objects or primitives (Cube, Sphere, etc.). Use parent_path to nest under a parent.
+- 'duplicate': Clone an existing GameObject. Requires path.
+- 'destroy': Remove objects (Undo supported). Requires path.
+- 'rename': Change a GameObject's name. Requires path + name. Response includes updated path.
+- 'reparent': Move objects in the hierarchy tree. Requires path. parent_path = new parent (omit to move to root). Response includes updated path.
+- 'move_scene': Move root objects between loaded scenes. Requires path + target_scene.
+
+All objects are identified by path (e.g. "/SampleScene/Player"). Use unity_query(action='list_children') to browse paths.`,
     schema: HierarchySchema,
     func: unityHierarchyImpl
 });
