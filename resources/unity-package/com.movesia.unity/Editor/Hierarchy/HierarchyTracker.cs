@@ -41,14 +41,16 @@ public static class HierarchyTracker
     {
         public int instanceId;
         public string name;
+        public string path;                // filesystem-like path: "/SceneName/Root/Child"
         public bool activeSelf;
         public bool activeInHierarchy;
         public string tag;
         public string layer;
         public string[] components;
         public int childCount;
+        public int descendantCount;        // total recursive descendants
         public bool isPrefabInstance;
-        public string prefabAssetPath;  // null if not a prefab instance
+        public string prefabAssetPath;     // null if not a prefab instance
         public bool hasPrefabOverrides;
         public GameObjectData[] children;
     }
@@ -58,7 +60,7 @@ public static class HierarchyTracker
     /// <summary>
     /// Capture full hierarchy snapshot of all loaded scenes.
     /// </summary>
-    public static HierarchySnapshot CaptureSnapshot(int maxDepth = 10)
+    public static HierarchySnapshot CaptureSnapshot(int maxDepth = 3)
     {
         int sceneCount = SceneManager.sceneCount;
         var scenes = new SceneData[sceneCount];
@@ -164,6 +166,7 @@ public static class HierarchyTracker
         {
             instanceId = go.GetInstanceID(),
             name = go.name,
+            path = GameObjectResolver.BuildPath(go),
             activeSelf = go.activeSelf,
             activeInHierarchy = go.activeInHierarchy,
             tag = go.tag,
@@ -174,7 +177,7 @@ public static class HierarchyTracker
             prefabAssetPath = prefabPath,
             hasPrefabOverrides = hasOverrides
         };
-        
+
         // Recursively capture children if within depth limit
         if (currentDepth < maxDepth && go.transform.childCount > 0)
         {
@@ -187,8 +190,19 @@ public static class HierarchyTracker
                     currentDepth + 1
                 );
             }
+
+            // Compute descendantCount from captured children
+            int descCount = data.children.Length;
+            for (int i = 0; i < data.children.Length; i++)
+                descCount += data.children[i].descendantCount;
+            data.descendantCount = descCount;
         }
-        
+        else
+        {
+            // Children not captured (depth limit) — compute on-the-fly
+            data.descendantCount = GameObjectResolver.CountDescendants(go.transform);
+        }
+
         return data;
     }
 }

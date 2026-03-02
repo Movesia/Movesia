@@ -215,7 +215,7 @@ public static class SpatialContextManager
         {
             foreach (int id in instanceIds)
             {
-                var go = UnityEditor.EditorUtility.InstanceIDToObject(id) as GameObject;
+                var go = EditorCompat.IdToObject(id) as GameObject;
                 if (go == null) continue;
                 if (focusIdSet.Contains(go.GetInstanceID())) continue;
 

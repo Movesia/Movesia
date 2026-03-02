@@ -2,44 +2,162 @@
 using UnityEngine;
 using UnityEditor;
 using System;
+using System.Collections.Generic;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 /// <summary>
 /// Dumps raw component data using EditorJsonUtility.
+/// Supports full dump, filtered dump (by component type), and summary mode (no properties).
+/// Auto-excludes Transform (data is at top-level of inspect response) and strips internal Unity fields.
 /// </summary>
 public static class ComponentInspector
 {
     [Serializable]
     public class RawComponentData
     {
-        public int instanceId;
+        [JsonIgnore]
+        public int instanceId;              // kept for internal use, never serialized
+
         public string type;
+
         public bool enabled;
-        public object properties; // Parsed JSON object
+        public bool ShouldSerializeenabled() => !enabled;  // omit when true (default)
+
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+        public object properties;           // null in summary mode → omitted
+    }
+
+    // Internal Unity serialization fields that bloat every component and carry no useful info for the agent
+    private static readonly HashSet<string> InternalFields = new HashSet<string>
+    {
+        "m_ObjectHideFlags",
+        "m_CorrespondingSourceObject",
+        "m_PrefabInstance",
+        "m_PrefabAsset",
+        "m_GameObject",
+        "m_EditorHideFlags",
+        "m_EditorClassIdentifier"
+    };
+
+    /// <summary>
+    /// Strip internal Unity metadata fields from a component's serialized properties.
+    /// </summary>
+    private static JObject StripInternalFields(JObject props)
+    {
+        if (props == null) return null;
+        foreach (var field in InternalFields)
+            props.Remove(field);
+        return props;
     }
 
     /// <summary>
     /// Dump all components for a GameObject as raw JSON strings.
+    /// Excludes Transform (top-level inspect fields cover it) and strips internal Unity fields.
     /// </summary>
     public static RawComponentData[] DumpComponents(GameObject go)
     {
         var components = go.GetComponents<Component>();
-        var result = new RawComponentData[components.Length];
-        
+        var results = new List<RawComponentData>();
+
         for (int i = 0; i < components.Length; i++)
         {
             var comp = components[i];
-            var jsonString = comp != null ? EditorJsonUtility.ToJson(comp, false) : null;
-            result[i] = new RawComponentData
+            if (comp == null)
             {
-                instanceId = comp != null ? comp.GetInstanceID() : 0,
-                type = comp != null ? comp.GetType().Name : "Missing",
+                results.Add(new RawComponentData
+                {
+                    instanceId = 0,
+                    type = "Missing",
+                    enabled = false,
+                    properties = null
+                });
+                continue;
+            }
+
+            // Skip Transform — data is already at top-level (localPosition, localRotation, etc.)
+            if (comp is Transform) continue;
+
+            var jsonString = EditorJsonUtility.ToJson(comp, false);
+            results.Add(new RawComponentData
+            {
+                instanceId = comp.GetInstanceID(),
+                type = comp.GetType().Name,
                 enabled = GetEnabled(comp),
-                properties = jsonString != null ? JObject.Parse(jsonString) : null
-            };
+                properties = StripInternalFields(JObject.Parse(jsonString))
+            });
         }
-        
-        return result;
+
+        return results.ToArray();
+    }
+
+    /// <summary>
+    /// Dump components filtered by type name. Returns only matching components with full properties.
+    /// If filter is null/empty, returns all (same as DumpComponents).
+    /// Only skips Transform when not explicitly requested in the filter.
+    /// </summary>
+    public static RawComponentData[] DumpComponentsFiltered(GameObject go, string[] typeFilter)
+    {
+        if (typeFilter == null || typeFilter.Length == 0)
+            return DumpComponents(go);
+
+        var filterSet = new HashSet<string>(typeFilter, StringComparer.OrdinalIgnoreCase);
+        var components = go.GetComponents<Component>();
+        var results = new List<RawComponentData>();
+
+        foreach (var comp in components)
+        {
+            if (comp == null) continue;
+            string typeName = comp.GetType().Name;
+            if (!filterSet.Contains(typeName)) continue;
+
+            var jsonString = EditorJsonUtility.ToJson(comp, false);
+            results.Add(new RawComponentData
+            {
+                instanceId = comp.GetInstanceID(),
+                type = typeName,
+                enabled = GetEnabled(comp),
+                properties = StripInternalFields(JObject.Parse(jsonString))
+            });
+        }
+
+        return results.ToArray();
+    }
+
+    /// <summary>
+    /// Summary-only dump: component type names and enabled status, no properties.
+    /// Optionally filtered by type name. Lightweight for progressive disclosure.
+    /// Excludes Transform (always present, data at top-level).
+    /// </summary>
+    public static RawComponentData[] DumpComponentsSummary(GameObject go, string[] typeFilter = null)
+    {
+        var components = go.GetComponents<Component>();
+        var results = new List<RawComponentData>();
+
+        HashSet<string> filterSet = null;
+        if (typeFilter != null && typeFilter.Length > 0)
+            filterSet = new HashSet<string>(typeFilter, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var comp in components)
+        {
+            if (comp == null) continue;
+
+            // Skip Transform unless explicitly requested
+            if (comp is Transform && (filterSet == null || !filterSet.Contains("Transform"))) continue;
+
+            string typeName = comp.GetType().Name;
+            if (filterSet != null && !filterSet.Contains(typeName)) continue;
+
+            results.Add(new RawComponentData
+            {
+                instanceId = comp.GetInstanceID(),
+                type = typeName,
+                enabled = GetEnabled(comp),
+                properties = null  // summary mode: no properties
+            });
+        }
+
+        return results.ToArray();
     }
 
     /// <summary>
@@ -47,7 +165,7 @@ public static class ComponentInspector
     /// </summary>
     public static RawComponentData DumpComponent(int instanceId)
     {
-        var obj = EditorUtility.InstanceIDToObject(instanceId);
+        var obj = EditorCompat.IdToObject(instanceId);
         if (obj is Component comp)
         {
             var jsonString = EditorJsonUtility.ToJson(comp, false);
@@ -56,7 +174,7 @@ public static class ComponentInspector
                 instanceId = comp.GetInstanceID(),
                 type = comp.GetType().Name,
                 enabled = GetEnabled(comp),
-                properties = JObject.Parse(jsonString)
+                properties = StripInternalFields(JObject.Parse(jsonString))
             };
         }
         return null;

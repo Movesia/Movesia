@@ -1,7 +1,14 @@
 /**
  * THE ENGINEER: unity_component
  * "I need to change behavior and data."
- * Consumes: add_component, remove_component, modify_component
+ * Consumes: unified "component" endpoint + "remove_component"
+ *
+ * The unified endpoint infers the action from which fields are provided:
+ *   componentType only          → ADD (idempotent)
+ *   componentType + properties  → find-or-add, then MODIFY (compound)
+ *   componentInstanceId + props → direct MODIFY (skips GO resolution)
+ *
+ * Remove is a separate endpoint because it's destructive.
  */
 
 import { z } from 'zod';
@@ -12,25 +19,63 @@ import { callUnityAsync } from './connection';
  * Zod schema for unity_component tool input
  */
 export const ComponentSchema = z.object({
-    action: z.enum(['add', 'remove', 'modify'])
-        .describe('The component operation.'),
+  action: z
+    .enum(['configure', 'remove'])
+    .describe(
+      "'configure': Add a component, modify its properties, or both in one call (action is inferred from fields). " +
+        "'remove': Destroy a component (separate destructive endpoint)."
+    ),
 
-    // Target identifier
-    path: z.string().optional()
-        .describe('Path to the target GameObject (e.g. "/SampleScene/Player"). Required for add. For modify/remove, use with component_type.'),
+  // Target identifiers (GameObject)
+  path: z
+    .string()
+    .optional()
+    .describe('Path to the target GameObject (e.g. "/SampleScene/Player"). Preferred over instance_id.'),
 
-    component_type: z.string().optional()
-        .describe("Component type name (e.g., 'Rigidbody', 'BoxCollider'). Required for 'add'. For 'modify'/'remove', use with path."),
+  instance_id: z.number().int().optional().describe('GameObject instance ID. Fallback when path is not known.'),
 
-    component_id: z.number().int().optional()
-        .describe("Direct component instance ID. Fallback alternative to path + component_type for 'modify'/'remove'."),
+  // Component identifiers
+  component_type: z
+    .string()
+    .optional()
+    .describe(
+      "Component type name (e.g., 'Rigidbody', 'BoxCollider', 'AudioSource'). " +
+        "For 'configure': provide this to add/find a component. " +
+        "For 'remove': provide with path to remove by type."
+    ),
 
-    component_index: z.number().int().default(0)
-        .describe('Index when multiple components of same type exist (default: 0 = first).'),
+  component_instance_id: z
+    .number()
+    .int()
+    .optional()
+    .describe(
+      'Direct component instance ID (from a previous response). ' +
+        "Skips GameObject resolution entirely. For 'configure': targets this exact component for modification. " +
+        "For 'remove': removes this exact component."
+    ),
 
-    // Properties for modify
-    properties: z.record(z.string(), z.unknown()).optional()
-        .describe("Properties to modify. Use array format for vectors: { m_LocalPosition: [0, 5, 0] }")
+  component_index: z
+    .number()
+    .int()
+    .default(0)
+    .describe('Which component when multiple of the same type exist (0-indexed, default: 0).'),
+
+  allow_duplicate: z
+    .boolean()
+    .default(false)
+    .describe(
+      'When true, always adds a new component instead of reusing an existing one. Useful for multiple AudioSources, Colliders, etc.'
+    ),
+
+  // Properties for modification
+  properties: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe(
+      'Map of SerializedProperty paths to values. Applied in a single batch. ' +
+        'Vectors use arrays: { m_LocalPosition: [0, 5, 0] }. Colors: { m_Color: [1, 0, 0, 1] }. ' +
+        'If omitted with component_type, the component is only added (no modification).'
+    ),
 });
 
 /** Type inferred from the Zod schema */
@@ -38,123 +83,137 @@ export type ComponentInput = z.infer<typeof ComponentSchema>;
 
 /**
  * Edit components on GameObjects. This is the "Engineer".
+ *
+ * Uses the unified "component" endpoint for add/modify operations.
+ * The endpoint infers the action from which fields are provided.
+ * Remove uses a separate "remove_component" endpoint.
  */
-async function unityComponentImpl(input: ComponentInput, _config?: any): Promise<string> {
-    const {
-        action,
-        path,
-        component_type,
-        component_id,
-        component_index = 0,
-        properties
-    } = input;
+async function unityComponentImpl (input: ComponentInput, _config?: any): Promise<string> {
+  const {
+    action,
+    path,
+    instance_id,
+    component_type,
+    component_instance_id,
+    component_index = 0,
+    allow_duplicate = false,
+    properties,
+  } = input;
 
-    let result;
+  let result;
 
-    switch (action) {
-        case 'add':
-            if (!path) {
-                return JSON.stringify({
-                    error: "path is required for 'add'",
-                    hint: "Use unity_query(action='list_children') to browse the hierarchy and find paths",
-                    example: 'unity_component({ action: "add", path: "/SampleScene/Player", component_type: "Rigidbody" })'
-                }, null, 2);
-            }
-            if (component_type === undefined) {
-                return JSON.stringify({
-                    error: "component_type is required for 'add'",
-                    hint: "Specify the component type to add (e.g., Rigidbody, BoxCollider, AudioSource)",
-                    example: 'unity_component({ action: "add", path: "/SampleScene/Player", component_type: "Rigidbody" })'
-                }, null, 2);
-            }
-            result = await callUnityAsync('add_component', {
-                path,
-                componentType: component_type
-            });
-            break;
+  switch (action) {
+    case 'configure': {
+      // Validate: need either component_type or component_instance_id
+      if (component_type === undefined && component_instance_id === undefined) {
+        return JSON.stringify(
+          {
+            error: "Either 'component_type' or 'component_instance_id' is required for 'configure'",
+            hint: 'Provide component_type to add/find a component, or component_instance_id to target one directly',
+            example:
+              'unity_component({ action: "configure", path: "/SampleScene/Player", component_type: "Rigidbody", properties: { m_Mass: 5.0 } })',
+          },
+          null,
+          2
+        );
+      }
 
-        case 'modify': {
-            if (properties === undefined) {
-                return JSON.stringify({
-                    error: "properties is required for 'modify'",
-                    hint: "Use array format for vectors: { m_LocalPosition: [0, 5, 0] }",
-                    example: 'unity_component({ action: "modify", path: "/SampleScene/Player", component_type: "Transform", properties: { m_LocalPosition: [0, 5, 0] } })'
-                }, null, 2);
-            }
+      // Validate: need a target (unless using component_instance_id)
+      if (component_instance_id === undefined && !path && instance_id === undefined) {
+        return JSON.stringify(
+          {
+            error: "Either 'path', 'instance_id', or 'component_instance_id' is required",
+            hint: 'Use path (preferred) to identify the GameObject, or component_instance_id for direct access',
+            example:
+              'unity_component({ action: "configure", path: "/SampleScene/Player", component_type: "Rigidbody" })',
+          },
+          null,
+          2
+        );
+      }
 
-            const modifyParams: Record<string, unknown> = { properties };
+      // Build params for the unified "component" endpoint
+      const params: Record<string, unknown> = {};
 
-            if (component_id !== undefined) {
-                // Direct component ID (fallback)
-                modifyParams.componentInstanceId = component_id;
-            } else if (path && component_type !== undefined) {
-                // Path + type (preferred)
-                modifyParams.path = path;
-                modifyParams.componentType = component_type;
-                modifyParams.componentIndex = component_index;
-            } else {
-                return JSON.stringify({
-                    error: "For 'modify', provide EITHER component_id OR (path + component_type)",
-                    hint: 'Easiest: use path + component_type, e.g., path: "/SampleScene/Player", component_type: "Transform"'
-                }, null, 2);
-            }
+      if (component_instance_id !== undefined) {
+        // Direct component targeting — skips GO resolution & find-or-add
+        params.componentInstanceId = component_instance_id;
+      } else {
+        // GO-based targeting
+        if (path) params.path = path;
+        if (instance_id !== undefined) params.instanceId = instance_id;
+      }
 
-            result = await callUnityAsync('modify_component', modifyParams);
-            break;
-        }
+      if (component_type !== undefined) params.componentType = component_type;
+      if (component_index !== 0) params.componentIndex = component_index;
+      if (allow_duplicate) params.allowDuplicate = true;
+      if (properties !== undefined) params.properties = properties;
 
-        case 'remove':
-            if (component_id !== undefined) {
-                result = await callUnityAsync('remove_component', {
-                    componentInstanceId: component_id
-                });
-            } else if (path && component_type !== undefined) {
-                result = await callUnityAsync('remove_component', {
-                    path,
-                    componentType: component_type,
-                    componentIndex: component_index
-                });
-            } else {
-                return JSON.stringify({
-                    error: "For 'remove', provide EITHER component_id OR (path + component_type)",
-                    hint: 'Easiest: use path + component_type from the hierarchy',
-                    example: 'unity_component({ action: "remove", path: "/SampleScene/Player", component_type: "Rigidbody" })'
-                }, null, 2);
-            }
-            break;
-
-        default: {
-            const _exhaustive: never = action;
-            result = { error: `Unknown action: ${_exhaustive}` };
-        }
+      result = await callUnityAsync('component', params);
+      break;
     }
 
-    return JSON.stringify(result, null, 2);
+    case 'remove': {
+      if (component_instance_id !== undefined) {
+        result = await callUnityAsync('remove_component', {
+          componentInstanceId: component_instance_id,
+        });
+      } else if (path && component_type !== undefined) {
+        result = await callUnityAsync('remove_component', {
+          path,
+          componentType: component_type,
+          componentIndex: component_index,
+        });
+      } else {
+        return JSON.stringify(
+          {
+            error: "For 'remove', provide EITHER component_instance_id OR (path + component_type)",
+            hint: 'Easiest: use path + component_type from the hierarchy',
+            example: 'unity_component({ action: "remove", path: "/SampleScene/Player", component_type: "Rigidbody" })',
+          },
+          null,
+          2
+        );
+      }
+      break;
+    }
+
+    default: {
+      const _exhaustive: never = action;
+      result = { error: `Unknown action: ${_exhaustive}` };
+    }
+  }
+
+  return JSON.stringify(result, null, 2);
 }
 
 /**
  * The Engineer - unity_component tool
- * Edit components on GameObjects.
+ * Add, modify, and remove components on GameObjects.
  */
 export const unityComponent = new DynamicStructuredTool({
-    name: 'unity_component',
-    description: `Edit components on GameObjects. This is the "Engineer".
+  name: 'unity_component',
+  description: `Add, modify, and remove components on GameObjects.
 
 Actions:
-- 'add': Attach a component. Requires path + component_type.
-- 'modify': Change properties. Use path + component_type (preferred) or component_id (fallback).
-- 'remove': Delete a component. Use path + component_type (preferred) or component_id (fallback).
+- 'configure': Smart add/modify (inferred from fields):
+  - path + component_type → ADD (idempotent, returns existing if present)
+  - path + component_type + properties → find-or-add, then MODIFY in one call
+  - component_instance_id + properties → direct MODIFY (skips GO resolution)
+  - allow_duplicate: true → force new component instead of reusing existing
+- 'remove': Destroy component by component_instance_id or path + component_type.
 
-RECOMMENDED WORKFLOW FOR MODIFY:
-Just use path + component_type - no need to inspect first!
-Example: unity_component({ action: 'modify', path: "/SampleScene/Player", component_type: 'Transform',
-                          properties: { m_LocalPosition: [0, 5, 0] } })
+WORKFLOW: Just provide path + component_type + properties. Adds the component if missing, then sets all properties in one round-trip:
+  unity_component({ action: 'configure', path: "/SampleScene/Player", component_type: 'Rigidbody',
+                    properties: { m_Mass: 5.0, m_UseGravity: true } })
+
+Use component_instance_id from previous responses for follow-up modifications without re-resolving.
 
 PROPERTY FORMAT:
-- Vectors use ARRAYS: { m_LocalPosition: [0, 5, 0] } correct
-- NOT objects: { m_LocalPosition: { x: 0 } } wrong
-
-Common types: Transform, Rigidbody, BoxCollider, SphereCollider, MeshRenderer, AudioSource, Light, Camera`,
-    schema: ComponentSchema,
-    func: unityComponentImpl
+- Vectors as arrays: { m_LocalPosition: [0, 5, 0] }
+- Colors as RGBA: { m_Color: [1.0, 0.0, 0.0, 1.0] }
+- Enums as int or string: { m_Type: 1 } or { m_Type: "Directional" }
+- NOT objects: { m_LocalPosition: { x: 0 } } ← WRONG`,
+  schema: ComponentSchema,
+  func: unityComponentImpl,
 });

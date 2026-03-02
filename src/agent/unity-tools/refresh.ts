@@ -196,7 +196,7 @@ async function unityRefreshImpl(input: RefreshInput, _config?: any): Promise<str
         if (missingScripts.length > 0) {
             response.warning = `Compilation passed, but these types are still missing: ${JSON.stringify(missingScripts)}. Did you get the class name right inside the file?`;
         } else if (foundScripts.length > 0) {
-            response.next_step = "You can now use unity_component({ action: 'add' }) with these scripts.";
+            response.next_step = "You can now use unity_component({ action: 'configure' }) with these scripts.";
         }
     }
 

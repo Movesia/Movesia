@@ -165,7 +165,18 @@ public static class MessageRouter
                     await LogHandlers.HandleClearLogs(requestId, body);
                     break;
 
-                // --- Hierarchy Read Operations ---
+                // --- Hierarchy Navigation (filesystem-like) ---
+                case "list_children":
+                    await HierarchyHandlers.HandleListChildren(requestId, body);
+                    break;
+                case "inspect_gameobject":
+                    await HierarchyHandlers.HandleInspectGameObject(requestId, body);
+                    break;
+                case "find_gameobjects":
+                    await HierarchyHandlers.HandleFindGameObjects(requestId, body);
+                    break;
+
+                // --- Hierarchy Read Operations (legacy) ---
                 case "get_hierarchy":
                     await HierarchyHandlers.HandleGetHierarchy(requestId, body);
                     break;
@@ -208,7 +219,12 @@ public static class MessageRouter
                     await HierarchyHandlers.HandleSetTransform(requestId, body);
                     break;
 
-                // --- Component Operations ---
+                // --- Unified Component Endpoint ---
+                case "component":
+                    await ComponentHandlers.HandleComponent(requestId, body);
+                    break;
+
+                // --- Legacy Component Operations ---
                 case "add_component":
                     await ComponentHandlers.HandleAddComponent(requestId, body);
                     break;

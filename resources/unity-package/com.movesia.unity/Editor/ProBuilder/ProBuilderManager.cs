@@ -250,7 +250,7 @@ public static partial class ProBuilderManager
         if (instanceId == 0)
             return (null, "instanceId is required");
 
-        var go = EditorUtility.EntityIdToObject(instanceId) as GameObject;
+        var go = EditorCompat.IdToObject(instanceId) as GameObject;
         if (go == null)
             return (null, $"GameObject with instanceId {instanceId} not found");
 
@@ -332,7 +332,7 @@ public static partial class ProBuilderManager
         if (matToken.Type == JTokenType.Integer)
         {
             int matId = matToken.ToObject<int>();
-            var mat = EditorUtility.EntityIdToObject(matId) as Material;
+            var mat = EditorCompat.IdToObject(matId) as Material;
             if (mat == null)
                 return (null, $"Material with instanceId {matId} not found");
             return (mat, null);
@@ -383,7 +383,7 @@ public static partial class ProBuilderManager
                 if (!result.success)
                     return (null, $"Inline material creation failed: {result.error}");
 
-                var createdMat = EditorUtility.EntityIdToObject(result.instanceId) as Material;
+                var createdMat = EditorCompat.IdToObject(result.instanceId) as Material;
                 if (createdMat == null)
                     return (null, "Inline material was created but could not be resolved");
 
@@ -394,7 +394,7 @@ public static partial class ProBuilderManager
             int objId = matObj?["instanceId"]?.ToObject<int>() ?? 0;
             if (objId != 0)
             {
-                var mat = EditorUtility.EntityIdToObject(objId) as Material;
+                var mat = EditorCompat.IdToObject(objId) as Material;
                 if (mat == null)
                     return (null, $"Material with instanceId {objId} not found");
                 return (mat, null);

@@ -304,7 +304,7 @@ public static partial class ProBuilderManager
             var meshes = new List<ProBuilderMesh>();
             foreach (int id in instanceIds)
             {
-                var go = EditorUtility.EntityIdToObject(id) as GameObject;
+                var go = EditorCompat.IdToObject(id) as GameObject;
                 if (go == null)
                     return Fail("merge", $"GameObject with instanceId {id} not found");
                 var pbMesh = go.GetComponent<ProBuilderMesh>();
