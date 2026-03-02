@@ -554,7 +554,6 @@ export class AgentService {
 
           currentToolCalls.delete(toolCallId)
           onEvent(protocol.finishStep())
-        }
       }
 
       if (hasTextContent) {

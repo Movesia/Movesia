@@ -14,8 +14,6 @@
  * - unity_deletion: The Janitor - asset deletion (moves to OS trash)
  * - unity_material: The Artist - material creation, modification, and assignment
  *
- * Note: Subagent-specific tools (probuilder, screenshot) are in ../subagent-tools/
- *
  * Setup:
  *     Before using tools, register the Unity manager:
  *
@@ -51,7 +49,6 @@ export { unityMaterial, MaterialSchema, type MaterialInput } from './material';
 
 /**
  * The 8 core Unity Tools as an array for easy registration with LangGraph.
- * Note: Subagent tools (probuilder, screenshot) are in ../subagent-tools/
  *
  * Usage:
  *     import { unityTools } from './unity-tools';

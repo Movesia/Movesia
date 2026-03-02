@@ -20,7 +20,7 @@ import { UNITY_AGENT_PROMPT } from './prompts';
 import type { UnityManager } from './UnityConnection/index';
 import { createLogger } from './UnityConnection/config';
 
-import { createAgent, todoListMiddleware } from 'langchain';
+import { createAgent } from 'langchain';
 import {
   createFilesystemMiddleware,
   CompositeBackend,
@@ -28,6 +28,9 @@ import {
   StoreBackend,
   FilesystemBackend,
 } from 'deepagents';
+import { OptimizedTodoMiddleware } from './middlewares/index';
+
+export { createFilesystemMiddleware, StateBackend };
 
 const log = createLogger('movesia.agent');
 
@@ -113,7 +116,7 @@ function createInternetSearch (apiKey?: string) {
 /**
  * Get all tools available to the agent.
  */
-function getAllTools (tavilyApiKey?: string): any[] {
+export function getAllTools (tavilyApiKey?: string): any[] {
   const tools: any[] = [...unityTools];
   const internetSearch = createInternetSearch(tavilyApiKey);
   if (internetSearch) {
@@ -137,17 +140,23 @@ function projectNamespaceHash (projectPath: string): string {
 }
 
 /**
+ * Optimized todo middleware (balanced mode) — replaces langchain's
+ * todoListMiddleware. Provides a write_todos tool + system prompt
+ * at ~630 tokens vs ~3,189 tokens for the original.
+ */
+const todoMiddleware = new OptimizedTodoMiddleware({ mode: 'balanced' });
+
+/**
  * Create the middleware stack for the agent.
+ * Note: The todo middleware is no longer a LangGraph middleware —
+ * its tool and system prompt are injected directly into the agent.
+ * Only the filesystem middleware uses the middleware[] parameter.
  */
 function createMiddlewareStack (projectPath?: string): any[] {
   const middleware: any[] = [];
   const names: string[] = [];
 
-  // 1. Todo list middleware
-  middleware.push(todoListMiddleware());
-  names.push('todoList');
-
-  // 2. Filesystem middleware - only if we have a project path
+  // Filesystem middleware - only if we have a project path
   if (projectPath) {
     const assetsPath = resolve(projectPath, 'Assets');
     log.debug(`Filesystem root: ${assetsPath}`);
@@ -211,11 +220,14 @@ export function createMovesiaAgent (options: CreateAgentOptions = {}) {
   const llm = createModel(openRouterApiKey);
   const modelName = (llm as any).modelName ?? 'unknown';
 
-  // Get tools
-  const tools = getAllTools(tavilyApiKey);
+  // Get tools + add todo middleware tool
+  const tools = [...getAllTools(tavilyApiKey), todoMiddleware.tool];
   const toolNames = tools.map((t: any) => t.name).join(', ');
 
-  // Build middleware stack
+  // Build system prompt with todo instructions appended
+  const systemPrompt = `${UNITY_AGENT_PROMPT}\n\n${todoMiddleware.systemPrompt}`;
+
+  // Build middleware stack (filesystem only — todo is injected directly)
   const middleware = createMiddlewareStack(projectPath);
   const middlewareNames = middleware.map((m: any) => m.name || 'anonymous').join(', ');
 
@@ -224,6 +236,7 @@ export function createMovesiaAgent (options: CreateAgentOptions = {}) {
   log.debug(`Model: ${modelName}`);
   log.debug(`Tools: [${toolNames}]`);
   log.debug(`Middleware: [${middlewareNames}]`);
+  log.debug(`Todo middleware: balanced (custom OptimizedTodoMiddleware)`);
   log.debug(`Checkpointer: ${checkpointer?.constructor.name ?? 'MemorySaver'}`);
   log.debug(`Store: ${store?.constructor.name ?? 'none'}`);
   log.debug(`Project: ${projectPath ?? 'none'}`);
@@ -232,7 +245,7 @@ export function createMovesiaAgent (options: CreateAgentOptions = {}) {
   const agent = createAgent({
     model: llm,
     tools,
-    systemPrompt: UNITY_AGENT_PROMPT,
+    systemPrompt,
     middleware,
     checkpointer,
     store,

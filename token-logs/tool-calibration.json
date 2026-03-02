@@ -1,0 +1,26 @@
+{
+  "calibratedAt": "2026-03-02T04:00:44.755Z",
+  "model": "anthropic/claude-haiku-4.5",
+  "bareBaseline": 1096,
+  "todoPromptCost": 101,
+  "fullBaseline": 1197,
+  "tools": {
+    "unity_query": 1432,
+    "unity_hierarchy": 1185,
+    "unity_component": 1416,
+    "unity_prefab": 1554,
+    "unity_scene": 765,
+    "unity_refresh": 757,
+    "unity_deletion": 795,
+    "unity_material": 1451,
+    "write_todos": 1422
+  },
+  "allToolsTotal": 6801,
+  "individualSum": 10777,
+  "perToolFrameworkOverhead": -3976,
+  "filesystemMiddleware": 1779,
+  "agentFrameworkOverhead": 0,
+  "fullBudgetFirstCall": 9777,
+  "actualMeasured": 9777,
+  "budgetDelta": 0
+}

@@ -9,40 +9,21 @@ import { DynamicStructuredTool } from '@langchain/core/tools';
 import { callUnityAsync } from './connection';
 
 /**
- * Color schema - [r, g, b] or [r, g, b, a] with floats 0-1
- */
-const ColorSchema = z
-  .union([z.tuple([z.number(), z.number(), z.number()]), z.tuple([z.number(), z.number(), z.number(), z.number()])])
-  .describe('Color as [r, g, b] or [r, g, b, a] with floats 0-1');
-
-/**
- * Vector schema for shader properties
- */
-const VectorSchema = z.tuple([z.number(), z.number(), z.number(), z.number()]).describe('Vector as [x, y, z, w]');
-
-/**
- * Material properties schema - supports friendly names that auto-resolve
+ * Material properties schema — simplified to reduce token cost.
+ * Validation (array length, shape) happens in the C# handler.
  */
 const PropertiesSchema = z
   .record(
     z.string(),
     z.union([
-      ColorSchema,
-      z.number(),
-      z.string(),
-      VectorSchema,
-      z.object({ instanceId: z.number().int() }),
-      z.object({ assetPath: z.string() }),
+      z.array(z.number()),              // colors [r,g,b,a], vectors [x,y,z,w]
+      z.number(),                        // metallic, smoothness, renderQueue
+      z.string(),                        // texture asset paths
+      z.record(z.string(), z.unknown()), // { instanceId: 123 } or { assetPath: "..." }
     ])
   )
-  .optional().describe(`Material properties to set. Friendly names auto-resolve:
-- color/baseColor/albedo → _BaseColor (URP) or _Color (Built-in)
-- mainTexture/baseMap/mainTex → _BaseMap (URP) or _MainTex (Built-in)
-- metallic → _Metallic
-- smoothness/glossiness → _Smoothness (URP) or _Glossiness (Built-in)
-- normalMap/bumpMap → _BumpMap
-- emissionColor → _EmissionColor
-- renderQueue → sets render queue directly (int)`);
+  .optional()
+  .describe('Properties with friendly names (color, metallic, smoothness, etc.) — auto-resolved.');
 
 /**
  * Keywords schema - object form { keyword: bool } or array form [keywords to enable]
@@ -244,24 +225,21 @@ export const unityMaterial = new DynamicStructuredTool({
   name: 'unity_material',
   description: `Create, modify, and assign materials.
 
-Actions:
-- 'create': New material. Optional: shader_name, name, save_path, properties.
-- 'modify': Change properties/keywords. Requires instance_id OR asset_path.
-- 'assign': Assign material to a Renderer. Requires instance_id OR asset_path + assign_to.
-- 'create_and_assign': Create + assign in one call.
+Actions: 'create' | 'modify' | 'assign' | 'create_and_assign'
+- create: Optional: shader_name, name, save_path, properties
+- modify: Requires instance_id OR asset_path
+- assign: Requires instance_id OR asset_path + assign_to
+- create_and_assign: Create + assign in one call
 
-PROPERTY FORMAT (friendly names auto-resolve to shader properties):
-- color/baseColor/albedo: [r,g,b,a] floats 0-1
-- metallic: 0.0-1.0, smoothness: 0.0-1.0
-- mainTexture/normalMap: asset path string
-- emissionColor: [r,g,b,a], renderQueue: int
+PROPERTIES (friendly names auto-resolve):
+color: [r,g,b,a] 0-1 | metallic/smoothness: 0-1 | mainTexture/normalMap: asset path | emissionColor: [r,g,b,a] | renderQueue: int
 
-KEYWORDS: { "_EMISSION": true, "_NORMALMAP": false } or ["_EMISSION"] (all enabled)
+KEYWORDS: { "_EMISSION": true } or ["_EMISSION"] (all enabled)
 
 EXAMPLES:
-Create: unity_material({ action: 'create', name: 'RedMetal', properties: { color: [1,0,0,1], metallic: 0.9 } })
-Assign: unity_material({ action: 'assign', asset_path: 'Assets/Materials/RedMetal.mat', assign_to: { game_object_path: "/SampleScene/Player" } })
-Create+assign: unity_material({ action: 'create_and_assign', name: 'BluePlastic', properties: { color: [0,0,1,1], metallic: 0.1, smoothness: 0.8 }, assign_to: { game_object_path: "/SampleScene/Player", slot_index: 0 } })`,
+unity_material({ action: 'create', name: 'RedMetal', properties: { color: [1,0,0,1], metallic: 0.9 } })
+unity_material({ action: 'assign', asset_path: 'Assets/Materials/RedMetal.mat', assign_to: { game_object_path: "/SampleScene/Player" } })
+unity_material({ action: 'create_and_assign', name: 'BluePlastic', properties: { color: [0,0,1,1], metallic: 0.1, smoothness: 0.8 }, assign_to: { game_object_path: "/SampleScene/Player", slot_index: 0 } })`,
   schema: MaterialSchema,
   func: unityMaterialImpl,
 });
