@@ -74,6 +74,7 @@ unity_component(action='configure', path='/SampleScene/Player', component_type='
 | Create/assign material | \`unity_material(action='create', name='Red', properties={color: [1,0,0,1]})\` |
 
 ## Output Rules
+- Never show tool names, tool calls, API syntax, or internal implementation details to the user. Just perform the action and describe the result naturally.
 - Never generate documentation files (.md, README, summaries, guides) unless the user explicitly asks for them.
 - Cite evidence: "Player at position [0, 5, 0] after modification"
 - Be concise—developers are busy

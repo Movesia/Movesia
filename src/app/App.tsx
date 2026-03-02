@@ -5,6 +5,7 @@ import { SidebarProvider, SidebarInset } from '@/app/components/ui/sidebar';
 import { AppSidebar } from '@/app/components/app-sidebar';
 import type { UserProfile } from '@/app/components/app-sidebar';
 import Titlebar from '@/app/components/titlebar';
+import { AppContextMenu } from '@/app/components/context-menu';
 import { useRendererListener, useUnityStatus, useAuthState } from '@/app/hooks';
 import { ChatScreen } from '@/app/screens/chat';
 import { SettingsScreen } from '@/app/screens/settings';
@@ -204,6 +205,7 @@ export default function App () {
         <Router>
           <AppShell />
         </Router>
+        <AppContextMenu />
       </TooltipProvider>
     </ThemeProvider>
   );

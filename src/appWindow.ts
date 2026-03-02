@@ -7,6 +7,7 @@ import { registerUnityIpc } from '@/ipc/unityIPC';
 import { registerWindowStateChangedEvents } from '@/windowState';
 
 import { BrowserWindow, Menu, app } from 'electron';
+import { registerContextMenu } from '@/menu/contextMenu';
 import windowStateKeeper from 'electron-window-state';
 
 import type { AgentService } from '@/services/agent-service';
@@ -72,6 +73,9 @@ export function createAppWindow (agentService?: AgentService | null, authService
 
   // Remove native menu — handled by custom React menu in renderer
   Menu.setApplicationMenu(null);
+
+  // Right-click context menu (Cut / Copy / Paste / Select All)
+  registerContextMenu(appWindow);
 
   // Show window when is ready to
   appWindow.on('ready-to-show', () => {
