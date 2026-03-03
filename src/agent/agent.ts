@@ -16,6 +16,9 @@ import { MemorySaver } from '@langchain/langgraph';
 import type { BaseCheckpointSaver } from '@langchain/langgraph';
 import type { BaseStore } from '@langchain/langgraph-checkpoint';
 import { unityTools, setUnityManager } from './unity-tools/index';
+// RAG tools disabled — uncomment when ready to use
+// import { ragTools, setQdrantConfig } from './rag-tools/index';
+// import type { QdrantConfig } from './rag-tools/index';
 import { UNITY_AGENT_PROMPT } from './prompts';
 import type { UnityManager } from './UnityConnection/index';
 import { createLogger } from './UnityConnection/config';
@@ -195,6 +198,7 @@ export interface CreateAgentOptions {
   openRouterApiKey?: string;
   tavilyApiKey?: string;
   projectPath?: string;
+  // qdrantConfig?: QdrantConfig;
 }
 
 /**

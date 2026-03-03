@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Clipboard, ClipboardPaste, Copy, Scissors, TextSelect } from 'lucide-react';
+import { ClipboardPaste, Copy, Scissors, TextSelect } from 'lucide-react';
 import { cn } from '@/app/lib/utils';
 
 interface MenuPosition {

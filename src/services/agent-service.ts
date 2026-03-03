@@ -15,6 +15,8 @@ import { URL } from 'url'
 import * as dotenv from 'dotenv'
 import { HumanMessage } from '@langchain/core/messages'
 import { createMovesiaAgent, type MovesiaAgent } from '../agent/agent'
+// RAG tools disabled — uncomment when ready to use
+// import type { QdrantConfig } from '../agent/rag-tools/index'
 import { UnityManager, createUnityManager } from '../agent/UnityConnection'
 import { setUnityManager } from '../agent/unity-tools/connection'
 import { createLogger } from '../agent/UnityConnection/config'
@@ -45,6 +47,27 @@ const LANGSMITH_API_KEY = process.env.LANGSMITH_API_KEY ?? ''
 const LANGSMITH_ENDPOINT =
   process.env.LANGSMITH_ENDPOINT ?? 'https://api.smith.langchain.com'
 const LANGSMITH_PROJECT = process.env.LANGSMITH_PROJECT ?? ''
+
+// Qdrant Knowledge Base — disabled, uncomment when ready to use
+// const QDRANT_URL = process.env.QDRANT_URL ?? ''
+// const QDRANT_API_KEY = process.env.QDRANT_API_KEY ?? ''
+//
+// function buildQdrantConfig(): QdrantConfig | undefined {
+//   if (!QDRANT_URL) return undefined
+//   return {
+//     url: QDRANT_URL,
+//     apiKey: QDRANT_API_KEY,
+//     openRouterApiKey: OPENROUTER_API_KEY,
+//     embeddingModel: 'openai/text-embedding-3-small',
+//     scoreThreshold: 0.35,
+//     timeout: 10_000,
+//     collections: [
+//       { name: 'unity-docs', description: 'Chunked Unity API/engine documentation', contentField: 'text', defaultLimit: 3 },
+//       { name: 'unity-workflows', description: 'Structured workflow recipes and implementation patterns', contentField: 'description', defaultLimit: 1 },
+//       { name: 'unity-guides', description: 'In-depth Unity ebooks', contentField: 'text', defaultLimit: 2 },
+//     ],
+//   }
+// }
 
 export interface AgentServiceConfig {
   /** Path from Electron's app.getPath('userData') */
@@ -308,6 +331,7 @@ export class AgentService {
       openRouterApiKey: OPENROUTER_API_KEY,
       tavilyApiKey: TAVILY_API_KEY || undefined,
       projectPath: this.config.projectPath,
+      // qdrantConfig: buildQdrantConfig(),
     })
 
     this.isInitialized = true
@@ -645,6 +669,7 @@ export class AgentService {
       openRouterApiKey: OPENROUTER_API_KEY,
       tavilyApiKey: TAVILY_API_KEY || undefined,
       projectPath: newPath,
+      // qdrantConfig: buildQdrantConfig(),
     })
     logger.info('Agent recreated with filesystem middleware')
 

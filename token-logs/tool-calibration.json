@@ -1,9 +1,9 @@
 {
-  "calibratedAt": "2026-03-02T04:00:44.755Z",
+  "calibratedAt": "2026-03-03T01:06:40.531Z",
   "model": "anthropic/claude-haiku-4.5",
-  "bareBaseline": 1096,
+  "bareBaseline": 1419,
   "todoPromptCost": 101,
-  "fullBaseline": 1197,
+  "fullBaseline": 1520,
   "tools": {
     "unity_query": 1432,
     "unity_hierarchy": 1185,
@@ -13,14 +13,15 @@
     "unity_refresh": 757,
     "unity_deletion": 795,
     "unity_material": 1451,
+    "knowledge_search": 1232,
     "write_todos": 1422
   },
-  "allToolsTotal": 6801,
-  "individualSum": 10777,
-  "perToolFrameworkOverhead": -3976,
+  "allToolsTotal": 7536,
+  "individualSum": 12009,
+  "perToolFrameworkOverhead": -4473,
   "filesystemMiddleware": 1779,
   "agentFrameworkOverhead": 0,
-  "fullBudgetFirstCall": 9777,
-  "actualMeasured": 9777,
+  "fullBudgetFirstCall": 10835,
+  "actualMeasured": 10835,
   "budgetDelta": 0
 }
