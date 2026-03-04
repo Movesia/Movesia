@@ -79,9 +79,10 @@ app.whenReady().then(async () => {
     );
   }
 
-  // Initialize agent service
+  // Initialize agent service (pass authService for proxy auth tokens)
   agentService = new AgentService({
     storagePath: userDataPath,
+    authService,
   });
 
   try {

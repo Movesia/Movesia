@@ -32,6 +32,7 @@ import {
   getSqliteStore,
 } from '../agent/database/engine'
 import { setLastProject, clearLastProject, lastProjectFromPath } from './app-settings'
+import type { AuthService } from './auth-service'
 
 // Load .env from app root (silently)
 dotenv.config({ path: join(process.cwd(), '.env') })
@@ -40,34 +41,12 @@ const logger = createLogger('movesia.agent')
 
 // Types
 
-// API Keys - Loaded from .env file
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY ?? ''
+// API Keys - Loaded from .env file (OpenRouter key removed — proxied via website)
 const TAVILY_API_KEY = process.env.TAVILY_API_KEY ?? ''
 const LANGSMITH_API_KEY = process.env.LANGSMITH_API_KEY ?? ''
 const LANGSMITH_ENDPOINT =
   process.env.LANGSMITH_ENDPOINT ?? 'https://api.smith.langchain.com'
 const LANGSMITH_PROJECT = process.env.LANGSMITH_PROJECT ?? ''
-
-// Qdrant Knowledge Base — disabled, uncomment when ready to use
-// const QDRANT_URL = process.env.QDRANT_URL ?? ''
-// const QDRANT_API_KEY = process.env.QDRANT_API_KEY ?? ''
-//
-// function buildQdrantConfig(): QdrantConfig | undefined {
-//   if (!QDRANT_URL) return undefined
-//   return {
-//     url: QDRANT_URL,
-//     apiKey: QDRANT_API_KEY,
-//     openRouterApiKey: OPENROUTER_API_KEY,
-//     embeddingModel: 'openai/text-embedding-3-small',
-//     scoreThreshold: 0.35,
-//     timeout: 10_000,
-//     collections: [
-//       { name: 'unity-docs', description: 'Chunked Unity API/engine documentation', contentField: 'text', defaultLimit: 3 },
-//       { name: 'unity-workflows', description: 'Structured workflow recipes and implementation patterns', contentField: 'description', defaultLimit: 1 },
-//       { name: 'unity-guides', description: 'In-depth Unity ebooks', contentField: 'text', defaultLimit: 2 },
-//     ],
-//   }
-// }
 
 export interface AgentServiceConfig {
   /** Path from Electron's app.getPath('userData') */
@@ -75,6 +54,8 @@ export interface AgentServiceConfig {
   /** Unity project path - can be set later via setProjectPath() */
   projectPath?: string
   wsPort?: number
+  /** AuthService for obtaining OAuth access tokens for the proxy */
+  authService?: AuthService
 }
 
 export interface ChatMessage {
@@ -260,10 +241,12 @@ export class AgentService {
   private wsServer: WebSocketServer | null = null
   private repository: ConversationRepository | null = null
   private config: AgentServiceConfig
+  private authService: AuthService | null = null
   private isInitialized = false
 
   constructor(config: AgentServiceConfig) {
     this.config = config
+    this.authService = config.authService ?? null
   }
 
   /**
@@ -285,9 +268,7 @@ export class AgentService {
     this.repository = getRepository()
     logger.info(`Database ready (${this.config.storagePath})`)
 
-    // API keys
-    process.env.OPENROUTER_API_KEY = OPENROUTER_API_KEY
-
+    // API keys (OpenRouter key removed — proxied via website backend)
     if (TAVILY_API_KEY) {
       process.env.TAVILY_API_KEY = TAVILY_API_KEY
     }
@@ -300,13 +281,10 @@ export class AgentService {
     }
 
     const ok = (v: string) => (v ? '\u2713' : '\u2717')
+    const hasAuth = this.authService ? ok('yes') : ok('')
     logger.info(
-      `Keys: OpenRouter ${ok(OPENROUTER_API_KEY)}  Tavily ${ok(TAVILY_API_KEY)}  LangSmith ${ok(LANGSMITH_API_KEY)}`
+      `Config: Auth ${hasAuth}  Tavily ${ok(TAVILY_API_KEY)}  LangSmith ${ok(LANGSMITH_API_KEY)}`
     )
-
-    if (!OPENROUTER_API_KEY) {
-      logger.error('OpenRouter API key MISSING — agent will not work')
-    }
 
     if (this.config.projectPath) {
       process.env.UNITY_PROJECT_PATH = this.config.projectPath
@@ -321,18 +299,51 @@ export class AgentService {
 
     setUnityManager(this.unityManager)
 
-    // Agent
+    // Agent — requires a valid auth token to create the model
+    const accessToken = await this.authService?.getAccessToken()
+    if (!accessToken) {
+      logger.error('Cannot initialize agent — not authenticated (no access token). Agent will be created when user signs in.')
+    } else {
+      logger.info(`Auth token obtained: ${accessToken.slice(0, 8)}...${accessToken.slice(-4)} (len=${accessToken.length})`)
+    }
+
     const checkpointer = getCheckpointSaver()
     const store = getSqliteStore()
-    this.agent = createMovesiaAgent({
-      checkpointer,
-      store,
-      unityManager: this.unityManager,
-      openRouterApiKey: OPENROUTER_API_KEY,
-      tavilyApiKey: TAVILY_API_KEY || undefined,
-      projectPath: this.config.projectPath,
-      // qdrantConfig: buildQdrantConfig(),
-    })
+
+    if (accessToken) {
+      this.agent = createMovesiaAgent({
+        checkpointer,
+        store,
+        unityManager: this.unityManager,
+        openRouterApiKey: accessToken,
+        tavilyApiKey: TAVILY_API_KEY || undefined,
+        projectPath: this.config.projectPath,
+      })
+    }
+
+    // Listen for token refreshes — recreate agent with fresh token
+    if (this.authService) {
+      this.authService.onTokenRefreshed(async () => {
+        const newToken = await this.authService?.getAccessToken()
+        if (!newToken) {
+          logger.warn('Token refresh callback fired but no token available')
+          return
+        }
+
+        logger.info('Recreating agent with refreshed access token...')
+        const cp = getCheckpointSaver()
+        const st = getSqliteStore()
+        this.agent = createMovesiaAgent({
+          checkpointer: cp,
+          store: st,
+          unityManager: this.unityManager ?? undefined,
+          openRouterApiKey: newToken,
+          tavilyApiKey: TAVILY_API_KEY || undefined,
+          projectPath: this.config.projectPath,
+        })
+        logger.info('Agent recreated with refreshed token')
+      })
+    }
 
     this.isInitialized = true
   }
@@ -424,9 +435,13 @@ export class AgentService {
     onEvent: (event: AgentEvent) => void
   ): Promise<{ threadId: string }> {
     if (!this.agent) {
-      onEvent({ type: 'error', errorText: 'Agent not initialized' })
+      const errorMsg = this.authService
+        ? 'Please sign in to use the agent'
+        : 'Agent not initialized'
+      logger.error(`handleChat blocked: ${errorMsg}`)
+      onEvent({ type: 'error', errorText: errorMsg })
       onEvent({ type: 'done' })
-      throw new Error('Agent not initialized')
+      throw new Error(errorMsg)
     }
 
     const protocol = new UIMessageStreamProtocol()
@@ -660,16 +675,21 @@ export class AgentService {
 
     // Recreate the agent so middleware (filesystem, etc.) gets the project path.
     // The agent's middleware stack is frozen at creation time, so we must rebuild it.
+    const accessToken = await this.authService?.getAccessToken()
+    if (!accessToken) {
+      logger.error('Cannot recreate agent for project path — not authenticated')
+      return
+    }
+
     const checkpointer = getCheckpointSaver()
     const store = getSqliteStore()
     this.agent = createMovesiaAgent({
       checkpointer,
       store,
       unityManager: this.unityManager ?? undefined,
-      openRouterApiKey: OPENROUTER_API_KEY,
+      openRouterApiKey: accessToken,
       tavilyApiKey: TAVILY_API_KEY || undefined,
       projectPath: newPath,
-      // qdrantConfig: buildQdrantConfig(),
     })
     logger.info('Agent recreated with filesystem middleware')
 

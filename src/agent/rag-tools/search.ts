@@ -100,7 +100,7 @@ async function knowledgeSearchImpl(input: KnowledgeSearchInput, _config?: any): 
     log.error(`Embedding failed: ${msg}`)
     return JSON.stringify({
       error: `Failed to embed query: ${msg}`,
-      hint: 'Check that OPENROUTER_API_KEY is valid and the embedding model is available.',
+      hint: 'Check that the user is authenticated and the embedding model is available.',
       example: 'knowledge_search({ query: "rigidbody physics", collections: ["unity-docs"] })',
     }, null, 2)
   }

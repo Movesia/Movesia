@@ -85,9 +85,10 @@ export function getCollectionMeta(name: string): CollectionMeta | undefined {
 // =============================================================================
 
 /**
- * Embed a text query using OpenRouter's embeddings endpoint.
+ * Embed a text query using the Movesia proxy's embeddings endpoint.
  *
- * Uses the same OPENROUTER_API_KEY that powers the LLM — no extra key needed.
+ * Routes through the website backend which validates the OAuth token
+ * and forwards to OpenRouter with the server-side API key.
  * Default model: openai/text-embedding-3-small (1536 dimensions).
  */
 export async function embedQuery(text: string): Promise<number[]> {
@@ -96,11 +97,12 @@ export async function embedQuery(text: string): Promise<number[]> {
   }
 
   const model = _config.embeddingModel ?? 'openai/text-embedding-3-small'
+  const proxyBaseUrl = process.env.MOVESIA_AUTH_URL || 'https://movesia.com'
 
-  const response = await fetch('https://openrouter.ai/api/v1/embeddings', {
+  const response = await fetch(`${proxyBaseUrl}/api/v1/embeddings`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${_config.openRouterApiKey}`,
+      'Authorization': `Bearer ${_config.openRouterApiKey}`, // OAuth access token (not API key)
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({

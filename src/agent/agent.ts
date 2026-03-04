@@ -85,16 +85,27 @@ export const UNITY_PROJECT_PATH_RESOLVED = _unityProjectPath ? resolve(_unityPro
 // =============================================================================
 
 /**
- * Create the ChatOpenAI model configured for OpenRouter.
+ * Create the ChatOpenAI model routed through the Movesia proxy.
+ *
+ * The proxy validates the OAuth access token, forwards to OpenRouter with
+ * the server-side API key, and logs usage analytics.
+ *
+ * @param accessToken - Required OAuth access token (sent as Authorization: Bearer)
+ * @param modelName - OpenRouter model identifier (default: anthropic/claude-haiku-4.5)
  */
-export function createModel (apiKey?: string, modelName?: string) {
+export function createModel (accessToken: string, modelName?: string) {
+  const proxyBaseUrl = process.env.MOVESIA_AUTH_URL || 'https://movesia.com';
+  log.info(
+    `Creating model via proxy: ${proxyBaseUrl}/api/v1 ` +
+    `(token: ${accessToken.slice(0, 8)}...${accessToken.slice(-4)}, len=${accessToken.length})`
+  );
   return new ChatOpenAI({
     modelName: modelName ?? 'anthropic/claude-haiku-4.5',
     streaming: true,
     configuration: {
-      baseURL: 'https://openrouter.ai/api/v1',
+      baseURL: `${proxyBaseUrl}/api/v1`,
     },
-    apiKey: apiKey ?? process.env.OPENROUTER_API_KEY,
+    apiKey: accessToken, // OAuth access token — validated server-side by the proxy
   });
 }
 

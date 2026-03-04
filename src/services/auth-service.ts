@@ -289,6 +289,7 @@ export class AuthService {
   private cachedUser: AuthUser | null = null
   private mainWindow: BrowserWindow | null = null
   private refreshTimer: ReturnType<typeof setTimeout> | null = null
+  private tokenRefreshCallbacks: Array<() => void> = []
 
   // ─────────────────────────────────────────────────────────────────────────
   // Window Reference (for broadcasting state changes via IPC)
@@ -301,6 +302,30 @@ export class AuthService {
   private broadcastState(state: AuthState): void {
     if (this.mainWindow && !this.mainWindow.isDestroyed()) {
       this.mainWindow.webContents.send('auth:state-changed', state)
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Token Refresh Callbacks (for AgentService to recreate agent with fresh token)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Register a callback to be called when the access token is refreshed.
+   * Used by AgentService to recreate the LLM model with the new token.
+   */
+  onTokenRefreshed(callback: () => void): void {
+    this.tokenRefreshCallbacks.push(callback)
+  }
+
+  private notifyTokenRefresh(): void {
+    if (this.tokenRefreshCallbacks.length === 0) return
+    log.info(`Notifying ${this.tokenRefreshCallbacks.length} token refresh listener(s)`)
+    for (const cb of this.tokenRefreshCallbacks) {
+      try {
+        cb()
+      } catch (err) {
+        log.warn(`Token refresh callback failed: ${(err as Error).message}`)
+      }
     }
   }
 
@@ -775,6 +800,7 @@ export class AuthService {
 
     const authState = this.buildAuthState(true)
     this.broadcastState(authState)
+    this.notifyTokenRefresh()
 
     log.info('Access token refreshed successfully')
 
