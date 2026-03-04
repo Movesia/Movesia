@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 0.1.1 (2026-03-04)
+
+
+### Features
+
+* Add persistent per-project memory and scratch awareness to agent ([d97b181](https://github.com/Hannyel0/Movesia/commit/d97b18143d92ca9fa4e0700cd84fda5b5845307e))
+* menu of the app was changed and refined ([1011e52](https://github.com/Hannyel0/Movesia/commit/1011e525ccf40dfb525570c43669c11203caaf2b))
+* settings page added ([fd06a14](https://github.com/Hannyel0/Movesia/commit/fd06a1450ddadf5018dc721f217e2057d1a00694))
+* setup screen with Unity connection, project switching, and auto-reconnect ([9af5f73](https://github.com/Hannyel0/Movesia/commit/9af5f73464c0b94a29403ebda85ffb2d3db707ba))
+* sidebar added ([b5eb2b6](https://github.com/Hannyel0/Movesia/commit/b5eb2b69a5ba9ff10a4ca8a483a05bd9d9e480d9))
+
+
+### Bug Fixes
+
+* prevent setup screen from auto-selecting last project on switch ([1579551](https://github.com/Hannyel0/Movesia/commit/1579551bb287980656847a9fb96743e6e7d72568))
+
 ### [2.3.2](https://github.com/flaviodelgrosso/reactronite/compare/v2.3.1...v2.3.2) (2025-10-18)
 
 
