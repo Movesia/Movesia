@@ -5,7 +5,7 @@
   "description": "AI-powered desktop assistant for Unity Editor — manage scenes, GameObjects, and scripts through natural conversation",
   "main": ".vite/build/main.js",
   "license": "MIT",
-  "packageManager": "pnpm@10.18.3",
+  "packageManager": "pnpm@10.30.3",
   "type": "module",
   "keywords": [
     "unity",
@@ -20,7 +20,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/movesia/movesia.git"
+    "url": "https://github.com/Hannyel0/Movesia.git"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -84,6 +84,7 @@
     "remark-gfm": "^4.0.1",
     "tailwind-merge": "^3.3.1",
     "tw-animate-css": "^1.3.6",
+    "update-electron-app": "^3.1.2",
     "use-stick-to-bottom": "^1.1.3",
     "ws": "^8.19.0",
     "zod": "3.25.67"
@@ -99,6 +100,7 @@
     "@electron-forge/plugin-auto-unpack-natives": "^7.8.2",
     "@electron-forge/plugin-fuses": "^7.8.2",
     "@electron-forge/plugin-vite": "^7.8.2",
+    "@electron-forge/publisher-github": "^7.11.1",
     "@electron-forge/shared-types": "^7.8.2",
     "@electron/fuses": "^2.0.0",
     "@tailwindcss/vite": "^4.1.11",

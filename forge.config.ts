@@ -6,6 +6,7 @@ import { MakerRpm } from '@electron-forge/maker-rpm';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerZIP } from '@electron-forge/maker-zip';
 import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
+import { PublisherGithub } from '@electron-forge/publisher-github';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 
@@ -52,6 +53,13 @@ const config: ForgeConfig = {
         // Register movesia:// protocol on Linux (DEB)
         mimeType: ['x-scheme-handler/movesia'],
       },
+    }),
+  ],
+  publishers: [
+    new PublisherGithub({
+      repository: { owner: 'Hannyel0', name: 'Movesia' },
+      prerelease: true,
+      draft: true,
     }),
   ],
   plugins: [
