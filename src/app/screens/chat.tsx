@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback, useDeferredValue, memo } from 'react'
 import { ArrowUp, Plus, Paperclip, Image, FileCode, Square, X } from 'lucide-react'
 import { Button } from '@/app/components/ui/button'
 import {
@@ -88,6 +88,62 @@ const SUGGESTIONS = [
   'Create a player movement script',
   'Analyze my project build size',
 ]
+
+// =============================================================================
+// Memoized message components — prevent re-rendering completed messages
+// =============================================================================
+
+const UserMessage = memo(function UserMessage({ content }: { content: string }) {
+  return (
+    <div className='flex justify-end'>
+      <div className='bg-secondary text-foreground rounded-2xl rounded-br-sm px-4 py-2.5 max-w-[75%]'>
+        <p className='text-sm whitespace-pre-wrap'>{content}</p>
+      </div>
+    </div>
+  )
+})
+
+const AssistantMessage = memo(function AssistantMessage({
+  message,
+  isStreaming,
+  isLastAssistant,
+  feedbackGiven,
+  onFeedback,
+}: {
+  message: ChatMessage
+  isStreaming: boolean
+  isLastAssistant: boolean
+  feedbackGiven: boolean
+  onFeedback: () => void
+}) {
+  // Defer content so markdown parsing is low-priority during streaming
+  const deferredContent = useDeferredValue(message.content)
+  // Use deferred value only while streaming; once done, use actual content immediately
+  const content = isStreaming ? deferredContent : message.content
+  const segments = buildSegments(content, message.toolParts)
+
+  return (
+    <div className='py-1'>
+      {segments.map((seg, i) =>
+        seg.kind === 'text' ? (
+          <Markdown key={`text-${i}`} id={`${message.id}-${i}`}>{seg.content}</Markdown>
+        ) : (
+          <div key={seg.toolPart.toolCallId || `tool-${i}`} className='my-2'>
+            <Tool toolPart={seg.toolPart} defaultOpen={false} />
+          </div>
+        )
+      )}
+      {isLastAssistant && !feedbackGiven && (
+        <div className='mt-2'>
+          <FeedbackBar
+            onHelpful={onFeedback}
+            onNotHelpful={onFeedback}
+          />
+        </div>
+      )}
+    </div>
+  )
+})
 
 // =============================================================================
 // Props
@@ -273,36 +329,22 @@ export function ChatScreen ({ messages, isLoading, status, error, onSendMessage 
               msg.role === 'assistant' &&
               !isLoading &&
               index === messages.length - 1
+            const isStreaming =
+              msg.role === 'assistant' &&
+              isLoading &&
+              index === messages.length - 1
 
             return msg.role === 'user' ? (
-              <div key={msg.id} className='flex justify-end'>
-                <div className='bg-secondary text-foreground rounded-2xl rounded-br-sm px-4 py-2.5 max-w-[75%]'>
-                  <p className='text-sm whitespace-pre-wrap'>{msg.content}</p>
-                </div>
-              </div>
+              <UserMessage key={msg.id} content={msg.content} />
             ) : (
-              <div key={msg.id} className='py-1'>
-                {(() => {
-                  const segments = buildSegments(msg.content, msg.toolParts)
-                  return segments.map((seg, i) =>
-                    seg.kind === 'text' ? (
-                      <Markdown key={`text-${i}`} id={`${msg.id}-${i}`}>{seg.content}</Markdown>
-                    ) : (
-                      <div key={seg.toolPart.toolCallId || `tool-${i}`} className='my-2'>
-                        <Tool toolPart={seg.toolPart} defaultOpen={false} />
-                      </div>
-                    )
-                  )
-                })()}
-                {isLastAssistant && !feedbackGiven.has(msg.id) && (
-                  <div className='mt-2'>
-                    <FeedbackBar
-                      onHelpful={() => setFeedbackGiven((prev) => new Set(prev).add(msg.id))}
-                      onNotHelpful={() => setFeedbackGiven((prev) => new Set(prev).add(msg.id))}
-                    />
-                  </div>
-                )}
-              </div>
+              <AssistantMessage
+                key={msg.id}
+                message={msg}
+                isStreaming={isStreaming}
+                isLastAssistant={isLastAssistant}
+                feedbackGiven={feedbackGiven.has(msg.id)}
+                onFeedback={() => setFeedbackGiven((prev) => new Set(prev).add(msg.id))}
+              />
             )
           })}
 

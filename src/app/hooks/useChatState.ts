@@ -99,6 +99,9 @@ export function useChatState(options: UseChatStateOptions = {}): UseChatStateRet
   const isStreamingRef = useRef<boolean>(false)
   // Tool call accumulator: toolCallId → ToolPart
   const toolCallsRef = useRef<Map<string, ToolPart>>(new Map())
+  // rAF batching: accumulate deltas and flush at ~60fps instead of per-token
+  const rafIdRef = useRef<number | null>(null)
+  const pendingTextFlushRef = useRef<boolean>(false)
 
   // Listen to stream events from main process
   useEffect(() => {
@@ -133,17 +136,26 @@ export function useChatState(options: UseChatStateOptions = {}): UseChatStateRet
           const delta = agentEvent.delta as string
           if (delta) {
             accumulatedTextRef.current += delta
-            setMessages(prev => {
-              const newMessages = [...prev]
-              const lastIdx = newMessages.length - 1
-              if (lastIdx >= 0 && newMessages[lastIdx].role === 'assistant') {
-                newMessages[lastIdx] = {
-                  ...newMessages[lastIdx],
-                  content: accumulatedTextRef.current,
-                }
-              }
-              return newMessages
-            })
+            // Batch: mark pending and schedule a single rAF flush
+            if (!pendingTextFlushRef.current) {
+              pendingTextFlushRef.current = true
+              rafIdRef.current = requestAnimationFrame(() => {
+                pendingTextFlushRef.current = false
+                rafIdRef.current = null
+                const text = accumulatedTextRef.current
+                setMessages(prev => {
+                  const newMessages = [...prev]
+                  const lastIdx = newMessages.length - 1
+                  if (lastIdx >= 0 && newMessages[lastIdx].role === 'assistant') {
+                    newMessages[lastIdx] = {
+                      ...newMessages[lastIdx],
+                      content: text,
+                    }
+                  }
+                  return newMessages
+                })
+              })
+            }
           }
           break
         }
@@ -276,11 +288,32 @@ export function useChatState(options: UseChatStateOptions = {}): UseChatStateRet
           break
         }
 
-        case 'done':
+        case 'done': {
+          // Flush any pending rAF delta before marking complete
+          if (rafIdRef.current !== null) {
+            cancelAnimationFrame(rafIdRef.current)
+            rafIdRef.current = null
+          }
+          if (pendingTextFlushRef.current) {
+            pendingTextFlushRef.current = false
+            const finalText = accumulatedTextRef.current
+            setMessages(prev => {
+              const newMessages = [...prev]
+              const lastIdx = newMessages.length - 1
+              if (lastIdx >= 0 && newMessages[lastIdx].role === 'assistant') {
+                newMessages[lastIdx] = {
+                  ...newMessages[lastIdx],
+                  content: finalText,
+                }
+              }
+              return newMessages
+            })
+          }
           isStreamingRef.current = false
           setStatus('ready')
           log('Chat', 'Stream complete', { finalText: accumulatedTextRef.current.slice(0, 100) })
           break
+        }
       }
     }
 
@@ -297,6 +330,9 @@ export function useChatState(options: UseChatStateOptions = {}): UseChatStateRet
     return () => {
       electron.ipcRenderer.removeListener('chat:stream-event', handleStreamEvent)
       electron.ipcRenderer.removeListener('chat:stream-error', handleStreamError)
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current)
+      }
     }
   }, [onToolCallEvent])
 
