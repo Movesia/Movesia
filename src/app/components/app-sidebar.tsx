@@ -368,17 +368,17 @@ export function AppSidebar ({
                 <SidebarMenuButton
                   size='lg'
                   tooltip={user.name}
-                  className='data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground outline-none ring-0 focus-visible:ring-0'
+                  className='data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground outline-none ring-0 focus-visible:ring-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:!p-0'
                 >
-                  <Avatar size='sm'>
+                  <Avatar size='sm' className='group-data-[collapsible=icon]:size-7'>
                     {user.avatar && <AvatarImage src={user.avatar} alt={user.name} />}
-                    <AvatarFallback className='text-[10px]'>{userInitials}</AvatarFallback>
+                    <AvatarFallback className='text-[10px] group-data-[collapsible=icon]:text-xs'>{userInitials}</AvatarFallback>
                   </Avatar>
-                  <div className='grid flex-1 text-left text-sm leading-tight'>
+                  <div className='grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden'>
                     <span className='truncate font-medium'>{user.name}</span>
                     <span className='truncate text-xs text-sidebar-foreground/60'>{user.email}</span>
                   </div>
-                  <ChevronsUpDown className='ml-auto size-4' />
+                  <ChevronsUpDown className='ml-auto size-4 group-data-[collapsible=icon]:hidden' />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent
