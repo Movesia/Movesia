@@ -39,7 +39,7 @@ const config: ForgeConfig = {
     // Set application copyright
     appCopyright: `Copyright © ${new Date().getFullYear()} ${author.name}`,
     // Set application icon
-    icon: path.resolve(rootDir, 'resources/favicon'),
+    icon: path.resolve(rootDir, 'assets/icons/icon'),
     // Register movesia:// protocol on macOS
     protocols: [
       {
@@ -65,6 +65,7 @@ const config: ForgeConfig = {
   makers: [
     new MakerSquirrel({
       name: productName,
+      setupIcon: path.resolve(rootDir, 'assets/icons/icon.ico'),
       // Register movesia:// protocol on Windows during install
       // This creates registry entries for the protocol handler
     }),

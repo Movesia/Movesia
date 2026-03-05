@@ -39,7 +39,7 @@ export function createAppWindow (agentService?: AgentService | null, authService
     show: false,
     autoHideMenuBar: true,
     frame: false,
-    icon: path.join(import.meta.dirname, '../../resources/favicon.ico'),
+    icon: path.join(import.meta.dirname, '../../assets/icons/icon.png'),
     backgroundColor: '#f8f9fa',
     webPreferences: {
       nodeIntegration: false,
