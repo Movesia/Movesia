@@ -424,10 +424,10 @@ internal static class HierarchyHandlers
                 isPrefabInstance = isPrefab,
                 prefabAssetPath = prefabPath,
                 hasPrefabOverrides = hasOverrides,
-                localPosition = new[] { localPos.x, localPos.y, localPos.z },
-                localRotation = new[] { localRot.x, localRot.y, localRot.z },
-                localScale = (localScl == Vector3.one) ? null : new[] { localScl.x, localScl.y, localScl.z },
-                worldPosition = new[] { worldPos.x, worldPos.y, worldPos.z },
+                localPosition = new[] { (float)System.Math.Round(localPos.x, 2), (float)System.Math.Round(localPos.y, 2), (float)System.Math.Round(localPos.z, 2) },
+                localRotation = new[] { (float)System.Math.Round(localRot.x, 2), (float)System.Math.Round(localRot.y, 2), (float)System.Math.Round(localRot.z, 2) },
+                localScale = (localScl == Vector3.one) ? null : new[] { (float)System.Math.Round(localScl.x, 2), (float)System.Math.Round(localScl.y, 2), (float)System.Math.Round(localScl.z, 2) },
+                worldPosition = new[] { (float)System.Math.Round(worldPos.x, 2), (float)System.Math.Round(worldPos.y, 2), (float)System.Math.Round(worldPos.z, 2) },
                 components = componentData
             };
 
