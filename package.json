@@ -25,7 +25,11 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "electron",
-      "better-sqlite3"
+      "better-sqlite3",
+      "electron-winstaller",
+      "@tailwindcss/oxide",
+      "esbuild",
+      "unrs-resolver"
     ],
     "overrides": {
       "zod": "3.25.67"
@@ -92,16 +96,16 @@
   "devDependencies": {
     "@commitlint/cli": "^20.0.0",
     "@commitlint/config-conventional": "^20.0.0",
-    "@electron-forge/cli": "^7.8.2",
-    "@electron-forge/maker-deb": "^7.8.2",
-    "@electron-forge/maker-rpm": "^7.8.2",
-    "@electron-forge/maker-squirrel": "^7.8.2",
-    "@electron-forge/maker-zip": "^7.8.2",
-    "@electron-forge/plugin-auto-unpack-natives": "^7.8.2",
-    "@electron-forge/plugin-fuses": "^7.8.2",
-    "@electron-forge/plugin-vite": "^7.8.2",
+    "@electron-forge/cli": "^7.11.1",
+    "@electron-forge/maker-deb": "^7.11.1",
+    "@electron-forge/maker-rpm": "^7.11.1",
+    "@electron-forge/maker-squirrel": "^7.11.1",
+    "@electron-forge/maker-zip": "^7.11.1",
+    "@electron-forge/plugin-auto-unpack-natives": "^7.11.1",
+    "@electron-forge/plugin-fuses": "^7.11.1",
+    "@electron-forge/plugin-vite": "^7.11.1",
     "@electron-forge/publisher-github": "^7.11.1",
-    "@electron-forge/shared-types": "^7.8.2",
+    "@electron-forge/shared-types": "^7.11.1",
     "@electron/fuses": "^2.0.0",
     "@tailwindcss/vite": "^4.1.11",
     "@types/better-sqlite3": "^7.6.13",
