@@ -27,7 +27,7 @@ import { createAgent } from 'langchain'
 import { createFilesystemMiddleware, StateBackend } from 'deepagents'
 import { unityTools } from '../agent/unity-tools/index'
 // RAG tools disabled — uncomment when ready to use
-// import { ragTools } from '../agent/rag-tools/index'
+// import { ragTools } from '../agent/knowledge-tools/index'
 import { UNITY_AGENT_PROMPT } from '../agent/prompts'
 import { OptimizedTodoMiddleware } from '../agent/middlewares/index'
 

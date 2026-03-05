@@ -16,7 +16,7 @@ import * as dotenv from 'dotenv'
 import { HumanMessage } from '@langchain/core/messages'
 import { createMovesiaAgent, type MovesiaAgent } from '../agent/agent'
 // RAG tools disabled — uncomment when ready to use
-// import type { QdrantConfig } from '../agent/rag-tools/index'
+// import type { QdrantConfig } from '../agent/knowledge-tools/index'
 import { UnityManager, createUnityManager } from '../agent/UnityConnection'
 import { setUnityManager } from '../agent/unity-tools/connection'
 import { createLogger } from '../agent/UnityConnection/config'

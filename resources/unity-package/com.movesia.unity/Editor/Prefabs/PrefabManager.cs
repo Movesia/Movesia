@@ -1028,17 +1028,41 @@ public static class PrefabManager
     {
         // Try Unity's TypeCache first
         var types = TypeCache.GetTypesDerivedFrom<Component>();
-        
+
+        // Collect matches with project-assembly priority
+        Type projectMatch = null;
+        Type packageMatch = null;
+
         // Exact match
-        var type = types.FirstOrDefault(t => t.Name == typeName);
-        if (type != null) return type;
+        foreach (var t in types)
+        {
+            if (t.Name == typeName)
+            {
+                string asmName = t.Assembly.GetName().Name;
+                if (asmName == "Assembly-CSharp" || asmName == "Assembly-CSharp-firstpass")
+                { projectMatch = t; break; }
+                else if (packageMatch == null) packageMatch = t;
+            }
+        }
+        if (projectMatch != null) return projectMatch;
+        if (packageMatch != null) return packageMatch;
 
         // Case-insensitive match
-        type = types.FirstOrDefault(t => t.Name.Equals(typeName, StringComparison.OrdinalIgnoreCase));
-        if (type != null) return type;
+        foreach (var t in types)
+        {
+            if (t.Name.Equals(typeName, StringComparison.OrdinalIgnoreCase))
+            {
+                string asmName = t.Assembly.GetName().Name;
+                if (asmName == "Assembly-CSharp" || asmName == "Assembly-CSharp-firstpass")
+                { projectMatch = t; break; }
+                else if (packageMatch == null) packageMatch = t;
+            }
+        }
+        if (projectMatch != null) return projectMatch;
+        if (packageMatch != null) return packageMatch;
 
-        // Full name match
-        type = types.FirstOrDefault(t => t.FullName == typeName);
+        // Full name match (namespace-qualified, no ambiguity)
+        var type = types.FirstOrDefault(t => t.FullName == typeName);
         if (type != null) return type;
 
         // Try direct type lookup

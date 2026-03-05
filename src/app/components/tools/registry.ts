@@ -1,3 +1,4 @@
+import { Globe, Trash2, Palette, ListTodo } from 'lucide-react'
 import type { ToolConfig, ToolRegistration, ToolUIComponent } from './types'
 
 // =============================================================================
@@ -42,6 +43,34 @@ const defaultConfigs: Record<string, ToolConfig> = {
     color: 'text-yellow-400',
     category: 'system',
     description: 'Trigger Unity asset database refresh',
+  },
+  unity_deletion: {
+    displayName: 'Delete Assets',
+    icon: Trash2,
+    color: 'text-red-400',
+    category: 'mutation',
+    description: 'Delete project assets (recoverable via OS trash)',
+  },
+  unity_material: {
+    displayName: 'Material Operation',
+    icon: Palette,
+    color: 'text-pink-400',
+    category: 'mutation',
+    description: 'Create, modify, or assign materials',
+  },
+  tavily_search: {
+    displayName: 'Web Search',
+    icon: Globe,
+    color: 'text-emerald-400',
+    category: 'query',
+    description: 'Search the internet for information',
+  },
+  write_todos: {
+    displayName: 'Update Todos',
+    icon: ListTodo,
+    color: 'text-amber-400',
+    category: 'system',
+    description: 'Manage task list',
   },
 }
 

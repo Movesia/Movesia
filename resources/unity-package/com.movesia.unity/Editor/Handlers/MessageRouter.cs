@@ -105,6 +105,12 @@ public static class MessageRouter
         { "instanceid",             "gameObjectInstanceId" },
         { "objectid",               "gameObjectInstanceId" },
 
+        // gameObjectPath
+        { "gameobjectpath",         "gameObjectPath" },
+        { "gopath",                 "gameObjectPath" },
+        { "targetpath",             "gameObjectPath" },
+        { "path",                   "gameObjectPath" },
+
         // slotIndex
         { "slotindex",              "slotIndex" },
         { "slotidx",                "slotIndex" },

@@ -11,14 +11,14 @@
 import { createHash } from 'crypto';
 import { resolve } from 'path';
 import { ChatOpenAI } from '@langchain/openai';
-import { TavilySearch } from '@langchain/tavily';
 import { MemorySaver } from '@langchain/langgraph';
 import type { BaseCheckpointSaver } from '@langchain/langgraph';
 import type { BaseStore } from '@langchain/langgraph-checkpoint';
 import { unityTools, setUnityManager } from './unity-tools/index';
+import { createInternetSearch } from './knowledge-tools/index';
 // RAG tools disabled — uncomment when ready to use
-// import { ragTools, setQdrantConfig } from './rag-tools/index';
-// import type { QdrantConfig } from './rag-tools/index';
+// import { ragTools, setQdrantConfig } from './knowledge-tools/index';
+// import type { QdrantConfig } from './knowledge-tools/index';
 import { UNITY_AGENT_PROMPT } from './prompts';
 import type { UnityManager } from './UnityConnection/index';
 import { createLogger } from './UnityConnection/config';
@@ -96,12 +96,13 @@ export const UNITY_PROJECT_PATH_RESOLVED = _unityProjectPath ? resolve(_unityPro
  */
 export function createModel (accessToken: string, modelName?: string) {
   const proxyBaseUrl = process.env.MOVESIA_AUTH_URL || 'https://movesia.com';
+  const defaultModel = process.env.MOVESIA_MODEL || 'minimax/minimax-m2.5:nitro';
   log.info(
     `Creating model via proxy: ${proxyBaseUrl}/api/v1 ` +
-    `(token: ${accessToken.slice(0, 8)}...${accessToken.slice(-4)}, len=${accessToken.length})`
+      `(token: ${accessToken.slice(0, 8)}...${accessToken.slice(-4)}, len=${accessToken.length})`
   );
   return new ChatOpenAI({
-    modelName: modelName ?? 'anthropic/claude-haiku-4.5',
+    modelName: modelName ?? defaultModel,
     streaming: true,
     configuration: {
       baseURL: `${proxyBaseUrl}/api/v1`,
@@ -113,20 +114,6 @@ export function createModel (accessToken: string, modelName?: string) {
 // =============================================================================
 // TOOLS
 // =============================================================================
-
-/**
- * Create internet search tool using Tavily.
- */
-function createInternetSearch (apiKey?: string) {
-  const key = apiKey ?? process.env.TAVILY_API_KEY;
-  if (!key) {
-    return null;
-  }
-  return new TavilySearch({
-    tavilyApiKey: key,
-    maxResults: 5,
-  });
-}
 
 /**
  * Get all tools available to the agent.
@@ -178,12 +165,19 @@ function createMiddlewareStack (projectPath?: string): any[] {
     middleware.push(
       createFilesystemMiddleware({
         backend: (config: any) => {
-          return new CompositeBackend(new NormalizedBackend(new FilesystemBackend({ rootDir: assetsPath, virtualMode: true })), {
-            '/scratch/': new StateBackend(config),
-            ...(config.store
-              ? { '/memories/': new StoreBackend(config, { namespace: ['projects', projectNamespaceHash(projectPath), 'memories'] }) }
-              : {}),
-          });
+          return new CompositeBackend(
+            new NormalizedBackend(new FilesystemBackend({ rootDir: assetsPath, virtualMode: true })),
+            {
+              '/scratch/': new StateBackend(config),
+              ...(config.store
+                ? {
+                    '/memories/': new StoreBackend(config, {
+                      namespace: ['projects', projectNamespaceHash(projectPath), 'memories'],
+                    }),
+                  }
+                : {}),
+            }
+          );
         },
       })
     );
@@ -220,7 +214,14 @@ export interface CreateAgentOptions {
  * parameter.
  */
 export function createMovesiaAgent (options: CreateAgentOptions = {}) {
-  const { checkpointer = new MemorySaver(), store, unityManager, openRouterApiKey, tavilyApiKey, projectPath } = options;
+  const {
+    checkpointer = new MemorySaver(),
+    store,
+    unityManager,
+    openRouterApiKey,
+    tavilyApiKey,
+    projectPath,
+  } = options;
 
   // Set project path if provided
   if (projectPath) {

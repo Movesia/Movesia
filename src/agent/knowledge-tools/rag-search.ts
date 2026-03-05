@@ -6,7 +6,7 @@
 
 import { z } from 'zod'
 import { DynamicStructuredTool } from '@langchain/core/tools'
-import { getQdrantClient, getQdrantConfig, getCollectionNames, getCollectionMeta, embedQuery } from './config'
+import { getQdrantClient, getQdrantConfig, getCollectionNames, getCollectionMeta, embedQuery } from './rag-config'
 import type { SearchResult, SearchToolResponse } from './types'
 
 const PREFIX = '[RAG]'

@@ -174,21 +174,51 @@ public static class HierarchyManipulator
         // Try TypeCache for all components
         var types = TypeCache.GetTypesDerivedFrom<Component>();
 
-        // Exact match
+        // Collect all exact matches, then pick the best one
+        Type projectMatch = null;    // From Assembly-CSharp (user's project)
+        Type packageMatch = null;    // From packages/plugins
+
         foreach (var t in types)
         {
             if (t.Name == typeName)
-                return t;
+            {
+                string asmName = t.Assembly.GetName().Name;
+                if (asmName == "Assembly-CSharp" || asmName == "Assembly-CSharp-firstpass")
+                {
+                    projectMatch = t;
+                    break; // User's project type always wins
+                }
+                else if (packageMatch == null)
+                {
+                    packageMatch = t; // Keep first package match as fallback
+                }
+            }
         }
 
-        // Case-insensitive match
+        if (projectMatch != null)
+            return projectMatch;
+        if (packageMatch != null)
+            return packageMatch;
+
+        // Case-insensitive match (same priority: project > package)
         foreach (var t in types)
         {
             if (t.Name.Equals(typeName, StringComparison.OrdinalIgnoreCase))
-                return t;
+            {
+                string asmName = t.Assembly.GetName().Name;
+                if (asmName == "Assembly-CSharp" || asmName == "Assembly-CSharp-firstpass")
+                {
+                    projectMatch = t;
+                    break;
+                }
+                else if (packageMatch == null)
+                {
+                    packageMatch = t;
+                }
+            }
         }
 
-        return null;
+        return projectMatch ?? packageMatch;
     }
 
     /// <summary>

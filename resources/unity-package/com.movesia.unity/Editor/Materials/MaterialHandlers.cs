@@ -145,6 +145,27 @@ internal static class MaterialHandlers
         {
             assignToGameObject = assignToToken["gameObjectInstanceId"]?.ToObject<int>() ?? 0;
             assignSlotIndex = assignToToken["slotIndex"]?.ToObject<int>() ?? 0;
+
+            // Support path-based resolution if no instanceId was provided
+            if (assignToGameObject == 0)
+            {
+                string goPath = assignToToken["gameObjectPath"]?.ToString();
+                if (!string.IsNullOrEmpty(goPath))
+                {
+                    var resolved = GameObjectResolver.Resolve(goPath);
+                    if (!resolved.success)
+                    {
+                        await MessageRouter.SendResponse(requestId, "material_result",
+                            new MaterialManager.MaterialResult
+                            {
+                                success = false,
+                                error = $"assignTo: {resolved.error}"
+                            });
+                        return;
+                    }
+                    assignToGameObject = resolved.gameObject.GetInstanceID();
+                }
+            }
         }
 
         var result = MaterialManager.ManageMaterial(

@@ -1,9 +1,7 @@
 #if UNITY_EDITOR
-using UnityEngine;
 using UnityEditor;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 
 /// <summary>
@@ -17,23 +15,9 @@ public static class AssetSearch
     [Serializable]
     public class AssetSearchResult
     {
-        public bool success;
-        public string error;
-        public int count;
-        public int totalFound;  // Before limit applied
-        public AssetInfo[] assets;
-    }
-
-    [Serializable]
-    public class AssetInfo
-    {
-        public string name;
-        public string assetPath;
-        public string guid;
-        public string type;           // The actual asset type (e.g., "Texture2D", "Material")
-        public string extension;
-        public string[] labels;
-        public long fileSizeBytes;    // -1 if unavailable
+        public string error;          // Only set on failure
+        public int totalFound;        // Total matches before limit (useful when truncated)
+        public string[] paths;        // Asset paths — the only thing the agent needs
     }
 
     // --- Common Type Aliases ---
@@ -166,11 +150,7 @@ public static class AssetSearch
                 
                 if (!AssetDatabase.IsValidFolder(folder))
                 {
-                    return new AssetSearchResult
-                    {
-                        success = false,
-                        error = $"Folder not found: {folder}"
-                    };
+                    return new AssetSearchResult { error = $"Folder not found: {folder}" };
                 }
                 
                 searchFolders = new[] { folder };
@@ -181,14 +161,14 @@ public static class AssetSearch
                 ? AssetDatabase.FindAssets(query, searchFolders)
                 : AssetDatabase.FindAssets(query);
 
-            // Process results
-            var assets = new List<AssetInfo>();
+            // Process results — collect only asset paths (lean response)
+            var paths = new List<string>();
             int totalFound = 0;
 
             foreach (var guid in guids)
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid);
-                
+
                 // Extension filter (post-processing since FindAssets doesn't support it)
                 if (!string.IsNullOrEmpty(extension))
                 {
@@ -198,52 +178,20 @@ public static class AssetSearch
                 }
 
                 totalFound++;
-                
-                if (assets.Count >= limit)
-                    continue;  // Keep counting but don't add more
 
-                // Get asset info
-                var asset = AssetDatabase.LoadMainAssetAtPath(path);
-                string assetType = asset != null ? asset.GetType().Name : "Unknown";
-                string[] assetLabels = asset != null ? AssetDatabase.GetLabels(asset) : Array.Empty<string>();
-                
-                // Get file size
-                long fileSize = -1;
-                try
-                {
-                    var fileInfo = new FileInfo(path);
-                    if (fileInfo.Exists)
-                        fileSize = fileInfo.Length;
-                }
-                catch { }
-
-                assets.Add(new AssetInfo
-                {
-                    name = Path.GetFileNameWithoutExtension(path),
-                    assetPath = path,
-                    guid = guid,
-                    type = assetType,
-                    extension = Path.GetExtension(path),
-                    labels = assetLabels,
-                    fileSizeBytes = fileSize
-                });
+                if (paths.Count < limit)
+                    paths.Add(path.StartsWith("Assets/") ? path.Substring(7) : path);
             }
 
             return new AssetSearchResult
             {
-                success = true,
-                count = assets.Count,
                 totalFound = totalFound,
-                assets = assets.ToArray()
+                paths = paths.ToArray()
             };
         }
         catch (Exception ex)
         {
-            return new AssetSearchResult
-            {
-                success = false,
-                error = ex.Message
-            };
+            return new AssetSearchResult { error = ex.Message };
         }
     }
 
