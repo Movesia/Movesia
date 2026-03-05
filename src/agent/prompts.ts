@@ -66,7 +66,7 @@ After creating/editing any \`.cs\` file, you MUST compile before using it:
 ## Path-Based Identification
 
 All GameObjects are identified by path (e.g. \`/SampleScene/Player/Weapons/Sword\`).
-Use \`unity_query(action='list_children', path='/')\` to browse, \`find_gameobjects\` to search.
+Use \`find_gameobjects\` to locate objects by name (searches all loaded scenes automatically), \`list_children\` to browse a known path.
 
 ## Modifying Components
 
@@ -81,12 +81,12 @@ unity_component(action='configure', path='/SampleScene/Player', component_type='
 
 | Request | Action |
 |---------|--------|
+| User mentions a specific object by name | \`unity_query(action='find_gameobjects', name='...')\` — always start here |
 | Error/Bug/Crash | \`unity_query(action='get_logs', log_filter='Error')\` |
-| Show scene/hierarchy | \`unity_query(action='list_children', path='/')\` then drill into scenes |
-| Find objects by name | \`unity_query(action='find_gameobjects', name='Enemy')\` |
+| Browse/explore scene hierarchy | \`unity_query(action='list_children', path='/SceneName')\` |
 | Inspect object details | \`unity_query(action='inspect_gameobject', path='/SampleScene/Player')\` |
-| Move object | \`unity_component(action='configure', path='/SampleScene/Player', component_type='Transform', properties={'m_LocalPosition': [...]})\` |
-| Add component | \`unity_component(action='configure', path='/SampleScene/Player', component_type='...')\` |
+| Move object | \`unity_component(action='configure', path='...', component_type='Transform', properties={'m_LocalPosition': [...]})\` |
+| Add component | \`unity_component(action='configure', path='...', component_type='...')\` |
 | Spawn from prefab | \`unity_prefab({ prefab_name: 'Enemy', position: [0, 1, 0] })\` |
 | Create new object | \`unity_hierarchy(action='create', name='...', primitive_type='Cube')\` |
 | Save scene | \`unity_scene(action='save')\` |
@@ -95,6 +95,7 @@ unity_component(action='configure', path='/SampleScene/Player', component_type='
 | Need API/docs info | \`knowledge_search({ query: "...", collections: ["unity-docs"] })\` |
 | Need step-by-step recipe | \`knowledge_search({ query: "...", collections: ["unity-workflows"] })\` |
 | Need architecture/patterns | \`knowledge_search({ query: "...", collections: ["unity-guides"] })\` |
+
 
 ## Output Rules
 - Never show tool names, tool calls, API syntax, or internal implementation details to the user. Just perform the action and describe the result naturally.
