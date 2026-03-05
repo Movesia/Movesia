@@ -1,7 +1,7 @@
 /**
  * THE OBSERVER: unity_query
  * "I need to see what exists."
- * Consumes: list_children, inspect_gameobject, find_gameobjects, get_project_settings, get_logs
+ * Consumes: list_children, inspect_gameobject, find_gameobjects, search_assets, get_project_settings, get_logs
  */
 
 import { z } from 'zod';
@@ -12,7 +12,7 @@ import { callUnityAsync } from './connection';
  * Zod schema for unity_query tool input
  */
 export const QuerySchema = z.object({
-    action: z.enum(['list_children', 'inspect_gameobject', 'find_gameobjects', 'get_logs', 'get_settings'])
+    action: z.enum(['list_children', 'inspect_gameobject', 'find_gameobjects', 'search_assets', 'get_logs', 'get_settings'])
         .describe('The query type.'),
 
     // --- list_children & inspect_gameobject params ---
@@ -40,6 +40,20 @@ export const QuerySchema = z.object({
         .describe("Scope search to this subtree path. For 'find_gameobjects'."),
     max_results: z.number().int().optional()
         .describe("Max results for 'find_gameobjects' (default 25)."),
+
+    // --- search_assets params ---
+    asset_type: z.enum(['material', 'texture', 'prefab', 'script', 'audio', 'scene', 'model', 'mesh', 'shader', 'animation', 'all']).optional()
+        .describe("Asset type to search for. For 'search_assets'."),
+    asset_name: z.string().optional()
+        .describe("Partial name match (case-insensitive). For 'search_assets'."),
+    label: z.string().optional()
+        .describe("Unity asset label filter. For 'search_assets'."),
+    folder: z.string().optional()
+        .describe("Scope to folder (e.g. 'Assets/Textures'). For 'search_assets'."),
+    extension: z.string().optional()
+        .describe("File extension filter (e.g. '.png'). For 'search_assets'."),
+    limit: z.number().int().optional()
+        .describe("Max results (default 100). For 'search_assets'."),
 
     // --- get_logs params ---
     log_filter: z.string().optional()
@@ -71,6 +85,12 @@ async function unityQueryImpl(input: QueryInput, _config?: any): Promise<string>
         component: componentTypeFilter,
         root,
         max_results: maxResults,
+        asset_type: assetType,
+        asset_name: assetName,
+        label: assetLabel,
+        folder: assetFolder,
+        extension: assetExtension,
+        limit: assetLimit,
         log_filter: logFilter,
         log_count: logCount,
         settings_category: settingsCategory
@@ -127,6 +147,18 @@ async function unityQueryImpl(input: QueryInput, _config?: any): Promise<string>
             break;
         }
 
+        case 'search_assets': {
+            const params: Record<string, unknown> = {};
+            if (assetType) params.type = assetType;
+            if (assetName) params.name = assetName;
+            if (assetLabel) params.label = assetLabel;
+            if (assetFolder) params.folder = assetFolder;
+            if (assetExtension) params.extension = assetExtension;
+            if (assetLimit !== undefined) params.limit = assetLimit;
+            result = await callUnityAsync('search_assets', params);
+            break;
+        }
+
         case 'get_logs':
             result = await callUnityAsync('get_logs', { filter: logFilter, limit: logCount });
             break;
@@ -156,6 +188,7 @@ Actions:
 - 'list_children': Browse the hierarchy incrementally (like "ls"). Use path="/" to list scenes, "/SceneName" for root objects. depth 1-3 controls recursion.
 - 'inspect_gameobject': Full detail on one object (like "cat"). Requires path. Use components=["Rigidbody"] to filter. detail="summary" for type names only.
 - 'find_gameobjects': Search by name/tag/layer/component (like "find/grep"). At least one filter required. Use root to scope to a subtree.
+- 'search_assets': Search project asset files by type/name/folder (case-insensitive). Use to find textures, materials, prefabs, scripts, etc. Returns asset paths.
 - 'get_logs': Check console for errors, warnings, or logs.
 - 'get_settings': Retrieve specific project settings.
 
@@ -164,7 +197,9 @@ NAVIGATION WORKFLOW:
 2. list_children({ path: "/SampleScene" }) → see root objects with descendantCount
 3. descendantCount < 20 → safe to drill with list_children at depth 2-3
 4. descendantCount > 50 → use find_gameobjects with root scoping instead
-5. inspect_gameobject to read component properties on a specific object`,
+5. inspect_gameobject to read component properties on a specific object
+
+ASSET SEARCH: search_assets({ asset_type: 'texture', asset_name: 'brick' }) → all textures matching "brick"`,
     schema: QuerySchema,
     func: unityQueryImpl
 });

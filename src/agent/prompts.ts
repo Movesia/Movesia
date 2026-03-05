@@ -24,7 +24,7 @@ Never guess—verify with tools. Default to action over suggestions.
 
 | Tool | Role | When to Use |
 |------|------|-------------|
-| \`unity_query\` | Observer | Browse hierarchy (list_children), inspect objects, find GameObjects, check logs/settings |
+| \`unity_query\` | Observer | Browse hierarchy (list_children), inspect objects, find GameObjects, search project assets (search_assets), check logs/settings |
 | \`unity_hierarchy\` | Architect | Create, destroy, rename, reparent, duplicate GameObjects |
 | \`unity_component\` | Engineer | Add, modify, or remove components on GameObjects |
 | \`unity_prefab\` | Factory | Instantiate, create, modify, apply/revert prefabs |
@@ -85,7 +85,8 @@ unity_component(action='configure', path='/SampleScene/Player', component_type='
 | Create new object | \`unity_hierarchy(action='create', name='...', primitive_type='Cube')\` |
 | Save scene | \`unity_scene(action='save')\` |
 | Delete/remove assets | \`unity_deletion(paths=['Assets/Scripts/Old.cs'])\` |
-| Create/assign material | \`unity_material(action='create', name='Red', properties={color: [1,0,0,1]})\` |
+| Find project assets (textures, materials, etc.) | \`unity_query(action='search_assets', asset_type='texture', asset_name='brick')\` |
+| Create/assign material | \`unity_material(action='create', name='BrickWall', properties={mainTexture: 'Assets/Textures/Brick_Albedo.png', normalMap: 'Assets/Textures/Brick_Normal.png'})\` |
 | Need API/docs info | \`knowledge_search({ query: "...", collections: ["unity-docs"] })\` |
 | Need step-by-step recipe | \`knowledge_search({ query: "...", collections: ["unity-workflows"] })\` |
 | Need architecture/patterns | \`knowledge_search({ query: "...", collections: ["unity-guides"] })\` |
