@@ -5,11 +5,13 @@
  * Unity running detection, and package status checks.
  */
 
-import { promises as fs } from 'fs';
+import { promises as fs, existsSync } from 'fs';
 import * as path from 'path';
 import { ipcMain, app, dialog, type BrowserWindow } from 'electron';
 import { UnityChannels } from '@/channels/unityChannels';
 import { findUnityProjects, isUnityProject } from '@/services/unity-project-scanner';
+
+const LOG_PREFIX = '[unity-ipc]';
 
 /**
  * Check if Unity has the project open by looking for the Temp directory
@@ -34,17 +36,39 @@ async function checkUnityRunning(projectPath: string): Promise<boolean> {
 async function checkPackageInstalled(
   projectPath: string
 ): Promise<{ installed: boolean; version?: string }> {
+  const pkgJsonPath = path.join(
+    projectPath,
+    'Packages',
+    'com.movesia.unity',
+    'package.json'
+  );
+  console.log(`${LOG_PREFIX} checkPackageInstalled called`);
+  console.log(`${LOG_PREFIX}   projectPath: "${projectPath}"`);
+  console.log(`${LOG_PREFIX}   looking for: "${pkgJsonPath}"`);
+  console.log(`${LOG_PREFIX}   exists (sync check): ${existsSync(pkgJsonPath)}`);
+
+  // Also check the parent directories to help debug
+  const packagesDir = path.join(projectPath, 'Packages');
+  const movesiaDir = path.join(packagesDir, 'com.movesia.unity');
+  console.log(`${LOG_PREFIX}   Packages/ exists: ${existsSync(packagesDir)}`);
+  console.log(`${LOG_PREFIX}   com.movesia.unity/ exists: ${existsSync(movesiaDir)}`);
+
+  if (existsSync(movesiaDir)) {
+    try {
+      const dirContents = await fs.readdir(movesiaDir);
+      console.log(`${LOG_PREFIX}   com.movesia.unity/ contents: [${dirContents.join(', ')}]`);
+    } catch (e) {
+      console.log(`${LOG_PREFIX}   failed to list dir: ${e}`);
+    }
+  }
+
   try {
-    const pkgJsonPath = path.join(
-      projectPath,
-      'Packages',
-      'com.movesia.unity',
-      'package.json'
-    );
     const content = await fs.readFile(pkgJsonPath, 'utf8');
     const parsed = JSON.parse(content);
+    console.log(`${LOG_PREFIX}   ✅ package found! version: ${parsed.version}`);
     return { installed: true, version: parsed.version };
-  } catch {
+  } catch (err) {
+    console.log(`${LOG_PREFIX}   ❌ package NOT found. Error: ${err instanceof Error ? err.message : err}`);
     return { installed: false };
   }
 }
@@ -72,11 +96,27 @@ async function copyDir(src: string, dest: string): Promise<void> {
  * In production it's in the app's resources directory.
  */
 function getBundledPackagePath(): string {
-  if (app.isPackaged) {
-    return path.join(process.resourcesPath, 'unity-package', 'com.movesia.unity');
+  const isPackaged = app.isPackaged;
+  let result: string;
+
+  if (isPackaged) {
+    result = path.join(process.resourcesPath, 'unity-package', 'com.movesia.unity');
+  } else {
+    result = path.join(import.meta.dirname, '../../resources/unity-package/com.movesia.unity');
   }
-  // Dev mode: resources/ is at project root
-  return path.join(import.meta.dirname, '../../resources/unity-package/com.movesia.unity');
+
+  console.log(`${LOG_PREFIX} getBundledPackagePath:`);
+  console.log(`${LOG_PREFIX}   isPackaged: ${isPackaged}`);
+  console.log(`${LOG_PREFIX}   resourcesPath: "${process.resourcesPath}"`);
+  console.log(`${LOG_PREFIX}   resolved path: "${result}"`);
+  console.log(`${LOG_PREFIX}   exists: ${existsSync(result)}`);
+  if (existsSync(result)) {
+    try {
+      const files = require('fs').readdirSync(result);
+      console.log(`${LOG_PREFIX}   contents: [${files.join(', ')}]`);
+    } catch { /* ignore */ }
+  }
+  return result;
 }
 
 /**
@@ -87,25 +127,36 @@ function getBundledPackagePath(): string {
 async function installPackage(
   projectPath: string
 ): Promise<{ success: boolean; version?: string; error?: string }> {
+  console.log(`${LOG_PREFIX} installPackage called`);
+  console.log(`${LOG_PREFIX}   projectPath: "${projectPath}"`);
+
   try {
     const srcPackage = getBundledPackagePath();
 
     // Verify bundled package exists
+    const srcPkgJson = path.join(srcPackage, 'package.json');
+    console.log(`${LOG_PREFIX}   checking bundled package.json: "${srcPkgJson}"`);
+    console.log(`${LOG_PREFIX}   bundled package.json exists: ${existsSync(srcPkgJson)}`);
+
     try {
-      await fs.access(path.join(srcPackage, 'package.json'));
+      await fs.access(srcPkgJson);
     } catch {
-      return { success: false, error: 'Bundled Movesia package not found.' };
+      console.log(`${LOG_PREFIX}   ❌ Bundled package NOT found at: "${srcPackage}"`);
+      return { success: false, error: `Bundled Movesia package not found at: ${srcPackage}` };
     }
 
     const destPackage = path.join(projectPath, 'Packages', 'com.movesia.unity');
+    console.log(`${LOG_PREFIX}   copying to: "${destPackage}"`);
 
     // Copy the package folder
     await copyDir(srcPackage, destPackage);
+    console.log(`${LOG_PREFIX}   ✅ copy complete`);
 
     // Read the installed version
     const pkgContent = await fs.readFile(path.join(destPackage, 'package.json'), 'utf8');
     const pkgJson = JSON.parse(pkgContent);
     const version = pkgJson.version as string | undefined;
+    console.log(`${LOG_PREFIX}   installed version: ${version}`);
 
     // Update Packages/manifest.json
     const manifestPath = path.join(projectPath, 'Packages', 'manifest.json');
@@ -119,10 +170,13 @@ async function installPackage(
     manifest.dependencies['com.movesia.unity'] = 'file:com.movesia.unity';
 
     await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
+    console.log(`${LOG_PREFIX}   ✅ manifest.json updated`);
 
     return { success: true, version };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
+    console.log(`${LOG_PREFIX}   ❌ installPackage failed: ${message}`);
+    if (err instanceof Error) console.log(`${LOG_PREFIX}   stack: ${err.stack}`);
     return { success: false, error: message };
   }
 }

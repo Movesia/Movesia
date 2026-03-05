@@ -1,15 +1,22 @@
 import { builtinModules } from 'node:module';
 
-import pkg from '../package.json';
-
 import type { AddressInfo } from 'node:net';
 import type { ConfigEnv, Plugin, UserConfig } from 'vite';
 
 export const builtins = ['electron', ...builtinModules.flatMap((m) => [m, `node:${m}`])];
 
+// Only externalize native modules that can't be bundled by Vite.
+// Pure JS packages (electron-squirrel-startup, update-electron-app, etc.)
+// must be bundled into main.js or they won't be found inside the .asar.
+const nativeModules = [
+  'better-sqlite3',  // native SQLite bindings — must stay external
+  'bufferutil',      // optional native dep of ws — kept external so ws falls back to pure JS
+  'utf-8-validate',  // optional native dep of ws — kept external so ws falls back to pure JS
+];
+
 export const external = [
   ...builtins,
-  ...Object.keys('dependencies' in pkg ? (pkg.dependencies as Record<string, unknown>) : {})
+  ...nativeModules,
 ];
 
 export function getBuildConfig (env: ConfigEnv<'build'>): UserConfig {

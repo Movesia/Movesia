@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
@@ -16,10 +17,23 @@ import type { ForgeConfig } from '@electron-forge/shared-types';
 
 const rootDir = process.cwd();
 
+/**
+ * Native modules that can't be bundled by Vite.
+ * These get copied into the package's node_modules and unpacked from the asar.
+ */
+const nativeModules = [
+  'better-sqlite3',
+  'bindings',           // dependency of better-sqlite3 (finds .node files)
+  'file-uri-to-path',   // dependency of bindings
+  'prebuild-install',   // dependency of better-sqlite3
+];
+
 const config: ForgeConfig = {
   packagerConfig: {
-    // Create asar archive for main, renderer process files
-    asar: true,
+    // Create asar archive — native modules are unpacked alongside it
+    asar: {
+      unpack: `**/node_modules/{${nativeModules.join(',')}}/**`,
+    },
     // Set executable name
     executableName: productName,
     // Set application copyright
@@ -31,6 +45,19 @@ const config: ForgeConfig = {
       {
         name: 'Movesia',
         schemes: ['movesia'],
+      },
+    ],
+    // Copy native modules into the package (Vite doesn't include node_modules)
+    afterCopy: [
+      (buildPath, _electronVersion, _platform, _arch, callback) => {
+        for (const mod of nativeModules) {
+          const src = path.resolve(rootDir, 'node_modules', mod);
+          const dst = path.resolve(buildPath, 'node_modules', mod);
+          if (fs.existsSync(src)) {
+            fs.cpSync(src, dst, { recursive: true });
+          }
+        }
+        callback();
       },
     ],
   },
