@@ -32,6 +32,7 @@ import {
   FilesystemBackend,
 } from 'deepagents';
 import { OptimizedTodoMiddleware } from './middlewares/index';
+import { NormalizedBackend } from './normalized-backend';
 
 export { createFilesystemMiddleware, StateBackend };
 
@@ -177,7 +178,7 @@ function createMiddlewareStack (projectPath?: string): any[] {
     middleware.push(
       createFilesystemMiddleware({
         backend: (config: any) => {
-          return new CompositeBackend(new FilesystemBackend({ rootDir: assetsPath, virtualMode: true }), {
+          return new CompositeBackend(new NormalizedBackend(new FilesystemBackend({ rootDir: assetsPath, virtualMode: true })), {
             '/scratch/': new StateBackend(config),
             ...(config.store
               ? { '/memories/': new StoreBackend(config, { namespace: ['projects', projectNamespaceHash(projectPath), 'memories'] }) }

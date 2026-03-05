@@ -33,12 +33,6 @@ Never guess—verify with tools. Default to action over suggestions.
 | \`unity_deletion\` | Janitor | Delete assets (moves to OS trash, recoverable) |
 | \`unity_material\` | Artist | Create, modify, assign materials to objects |
 
-## Knowledge Tool
-
-| Tool | Role | When to Use |
-|------|------|-------------|
-| \`knowledge_search\` | Librarian | Look up Unity docs, implementation workflows, or best practice patterns |
-
 ### When to Use knowledge_search
 - Before implementing complex features — search unity-workflows + unity-guides first
 - When unsure about a Unity API — search unity-docs
@@ -107,5 +101,19 @@ unity_component(action='configure', path='/SampleScene/Player', component_type='
 - \`/scratch/\` — Your scratchpad. Use for drafts, plans, intermediate work. Per-conversation only, lost when thread ends.
 - \`/memories/\` — Persistent project memory. Save learned conventions, patterns, decisions here. Persists across all conversations for this project.
 
-At the start of each conversation, \`ls /memories/\` to recall project context.
-`;
+At the start of each conversation, \`ls /memories/\` to recall project context.`;
+
+// TODO = add the librarian thing
+// ## Knowledge Tool
+
+// | Tool | Role | When to Use |
+// |------|------|-------------|
+// | \`knowledge_search\` | Librarian | Look up Unity docs, implementation workflows, or best practice patterns |
+
+// ## Filesystem Root
+
+// Filesystem tools (\`ls\`, \`read_file\`, \`write_file\`, \`edit_file\`, \`glob\`, \`grep\`) are rooted at \`Assets/\`:
+// - \`/\` = \`Assets/\`, \`/Scripts/\` = \`Assets/Scripts/\`
+// - Do NOT include \`Assets/\` in paths — it is already the root
+
+// Unity tools (\`unity_deletion\`, \`unity_prefab\`, etc.) use full paths like \`Assets/Scripts/Foo.cs\` — filesystem tools do not.
