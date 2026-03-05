@@ -48,7 +48,43 @@ public static class ComponentInspector
         if (props == null) return null;
         foreach (var field in InternalFields)
             props.Remove(field);
+        EnrichObjectReferences(props);
         return props;
+    }
+
+    /// <summary>
+    /// Recursively walks a JObject/JArray tree and enriches any Unity object references
+    /// (objects with fileID + guid) by resolving the guid to an asset path via AssetDatabase.
+    /// </summary>
+    private static void EnrichObjectReferences(JToken token)
+    {
+        if (token == null) return;
+
+        if (token.Type == JTokenType.Object)
+        {
+            var obj = (JObject)token;
+
+            // Check if this object is a Unity object reference ({fileID, guid, type})
+            if (obj.TryGetValue("guid", out var guidToken) && obj.ContainsKey("fileID"))
+            {
+                string guid = guidToken.ToString();
+                if (!string.IsNullOrEmpty(guid) && guid != "00000000000000000000000000000000")
+                {
+                    string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                    if (!string.IsNullOrEmpty(assetPath))
+                        obj["assetPath"] = assetPath;
+                }
+            }
+
+            // Recurse into child properties
+            foreach (var property in obj.Properties())
+                EnrichObjectReferences(property.Value);
+        }
+        else if (token.Type == JTokenType.Array)
+        {
+            foreach (var item in (JArray)token)
+                EnrichObjectReferences(item);
+        }
     }
 
     /// <summary>
