@@ -15,10 +15,8 @@ import { MemorySaver } from '@langchain/langgraph';
 import type { BaseCheckpointSaver } from '@langchain/langgraph';
 import type { BaseStore } from '@langchain/langgraph-checkpoint';
 import { unityTools, setUnityManager } from './unity-tools/index';
-import { createInternetSearch } from './knowledge-tools/index';
-// RAG tools disabled — uncomment when ready to use
-// import { ragTools, setQdrantConfig } from './knowledge-tools/index';
-// import type { QdrantConfig } from './knowledge-tools/index';
+import { createInternetSearch, knowledgeSearch, setQdrantConfig } from './knowledge-tools/index';
+import type { QdrantConfig } from './knowledge-tools/index';
 import { UNITY_AGENT_PROMPT } from './prompts';
 import type { UnityManager } from './UnityConnection/index';
 import { createLogger } from './UnityConnection/config';
@@ -204,7 +202,7 @@ export interface CreateAgentOptions {
   openRouterApiKey?: string;
   tavilyApiKey?: string;
   projectPath?: string;
-  // qdrantConfig?: QdrantConfig;
+  qdrantConfig?: QdrantConfig;
 }
 
 /**
@@ -221,6 +219,7 @@ export function createMovesiaAgent (options: CreateAgentOptions = {}) {
     openRouterApiKey,
     tavilyApiKey,
     projectPath,
+    qdrantConfig,
   } = options;
 
   // Set project path if provided
@@ -233,12 +232,20 @@ export function createMovesiaAgent (options: CreateAgentOptions = {}) {
     setUnityManager(unityManager);
   }
 
+  // Configure Qdrant for knowledge search if provided
+  if (qdrantConfig) {
+    setQdrantConfig(qdrantConfig);
+  }
+
   // Create model
   const llm = createModel(openRouterApiKey);
   const modelName = (llm as any).modelName ?? 'unknown';
 
-  // Get tools + add todo middleware tool
+  // Get tools + add todo middleware tool + knowledge search (if configured)
   const tools = [...getAllTools(tavilyApiKey), todoMiddleware.tool];
+  if (qdrantConfig) {
+    tools.push(knowledgeSearch);
+  }
   const toolNames = tools.map((t: any) => t.name).join(', ');
 
   // Build system prompt with todo instructions appended

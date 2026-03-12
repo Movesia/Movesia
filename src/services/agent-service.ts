@@ -15,8 +15,7 @@ import { URL } from 'url'
 import * as dotenv from 'dotenv'
 import { HumanMessage } from '@langchain/core/messages'
 import { createMovesiaAgent, type MovesiaAgent } from '../agent/agent'
-// RAG tools disabled — uncomment when ready to use
-// import type { QdrantConfig } from '../agent/knowledge-tools/index'
+import type { QdrantConfig } from '../agent/knowledge-tools/index'
 import { UnityManager, createUnityManager } from '../agent/UnityConnection'
 import { setUnityManager } from '../agent/unity-tools/connection'
 import { createLogger } from '../agent/UnityConnection/config'
@@ -47,6 +46,45 @@ const LANGSMITH_API_KEY = process.env.LANGSMITH_API_KEY ?? ''
 const LANGSMITH_ENDPOINT =
   process.env.LANGSMITH_ENDPOINT ?? 'https://api.smith.langchain.com'
 const LANGSMITH_PROJECT = process.env.LANGSMITH_PROJECT ?? ''
+
+// Qdrant configuration for knowledge search (RAG)
+const QDRANT_URL = process.env.QDRANT_URL ?? ''
+const QDRANT_API_KEY = process.env.QDRANT_API_KEY ?? ''
+
+/**
+ * Build the Qdrant configuration for knowledge search.
+ * Returns undefined if QDRANT_URL or QDRANT_API_KEY are not set.
+ *
+ * @param accessToken - OAuth access token for embedding API calls
+ */
+function buildQdrantConfig(accessToken: string): QdrantConfig | undefined {
+  if (!QDRANT_URL || !QDRANT_API_KEY) {
+    return undefined
+  }
+
+  return {
+    url: QDRANT_URL,
+    apiKey: QDRANT_API_KEY,
+    openRouterApiKey: accessToken,
+    embeddingModel: 'openai/text-embedding-3-small',
+    scoreThreshold: 0.35,
+    timeout: 10_000,
+    collections: [
+      {
+        name: 'unity-docs',
+        description: 'Unity API reference and engine documentation',
+        contentField: 'content',
+        defaultLimit: 3,
+      },
+      {
+        name: 'unity-guides',
+        description: 'In-depth ebooks: architecture, patterns, performance, DOTS',
+        contentField: 'content',
+        defaultLimit: 2,
+      },
+    ],
+  }
+}
 
 export interface AgentServiceConfig {
   /** Path from Electron's app.getPath('userData') */
@@ -283,7 +321,7 @@ export class AgentService {
     const ok = (v: string) => (v ? '\u2713' : '\u2717')
     const hasAuth = this.authService ? ok('yes') : ok('')
     logger.info(
-      `Config: Auth ${hasAuth}  Tavily ${ok(TAVILY_API_KEY)}  LangSmith ${ok(LANGSMITH_API_KEY)}`
+      `Config: Auth ${hasAuth}  Tavily ${ok(TAVILY_API_KEY)}  LangSmith ${ok(LANGSMITH_API_KEY)}  Qdrant ${ok(QDRANT_URL && QDRANT_API_KEY ? 'yes' : '')}`
     )
 
     if (this.config.projectPath) {
@@ -318,6 +356,7 @@ export class AgentService {
         openRouterApiKey: accessToken,
         tavilyApiKey: TAVILY_API_KEY || undefined,
         projectPath: this.config.projectPath,
+        qdrantConfig: buildQdrantConfig(accessToken),
       })
     }
 
@@ -340,6 +379,7 @@ export class AgentService {
           openRouterApiKey: newToken,
           tavilyApiKey: TAVILY_API_KEY || undefined,
           projectPath: this.config.projectPath,
+          qdrantConfig: buildQdrantConfig(newToken),
         })
         logger.info('Agent recreated with refreshed token')
       })
@@ -690,6 +730,7 @@ export class AgentService {
       openRouterApiKey: accessToken,
       tavilyApiKey: TAVILY_API_KEY || undefined,
       projectPath: newPath,
+      qdrantConfig: buildQdrantConfig(accessToken),
     })
     logger.info('Agent recreated with filesystem middleware')
 
