@@ -1042,8 +1042,21 @@ public static class HierarchyManipulator
                     }
                     else if (value.Type == JTokenType.String)
                     {
-                        // Accept asset path string — load via AssetDatabase
-                        string assetPath = value.ToString();
+                        string strValue = value.ToString();
+
+                        // Try scene hierarchy path first (e.g. "/SceneName/Parent/Child")
+                        if (strValue.Contains("/"))
+                        {
+                            var resolved = GameObjectResolver.Resolve(strValue);
+                            if (resolved.success && resolved.gameObject != null)
+                            {
+                                property.objectReferenceValue = resolved.gameObject;
+                                return null;
+                            }
+                        }
+
+                        // Fall back to asset path via AssetDatabase
+                        string assetPath = strValue;
                         if (!assetPath.StartsWith("Assets"))
                             assetPath = "Assets/" + assetPath.TrimStart('/');
                         var obj = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath);
@@ -1080,7 +1093,21 @@ public static class HierarchyManipulator
                                               || p.Name.Replace("_", "").Equals("path", StringComparison.OrdinalIgnoreCase));
                         if (pathProperty != null)
                         {
-                            string assetPath = pathProperty.Value.ToString();
+                            string pathStr = pathProperty.Value.ToString();
+
+                            // Try scene hierarchy path first
+                            if (pathStr.Contains("/"))
+                            {
+                                var resolved = GameObjectResolver.Resolve(pathStr);
+                                if (resolved.success && resolved.gameObject != null)
+                                {
+                                    property.objectReferenceValue = resolved.gameObject;
+                                    return null;
+                                }
+                            }
+
+                            // Fall back to asset path via AssetDatabase
+                            string assetPath = pathStr;
                             if (!assetPath.StartsWith("Assets"))
                                 assetPath = "Assets/" + assetPath.TrimStart('/');
                             var obj = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath);

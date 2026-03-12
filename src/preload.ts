@@ -21,6 +21,7 @@ const ALLOWED_SEND_CHANNELS = [
   'show-context-menu',
   // Agent channels (renderer → main)
   'chat:send',
+  'chat:abort',
   'threads:list',
   'threads:delete',
   'threads:messages',

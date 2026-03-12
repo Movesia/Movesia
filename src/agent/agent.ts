@@ -14,6 +14,7 @@ import { ChatOpenAI } from '@langchain/openai';
 import { MemorySaver } from '@langchain/langgraph';
 import type { BaseCheckpointSaver } from '@langchain/langgraph';
 import type { BaseStore } from '@langchain/langgraph-checkpoint';
+import { SystemMessage } from '@langchain/core/messages';
 import { unityTools, setUnityManager } from './unity-tools/index';
 import { createInternetSearch, knowledgeSearch, setQdrantConfig } from './knowledge-tools/index';
 import type { QdrantConfig } from './knowledge-tools/index';
@@ -94,7 +95,7 @@ export const UNITY_PROJECT_PATH_RESOLVED = _unityProjectPath ? resolve(_unityPro
  */
 export function createModel (accessToken: string, modelName?: string) {
   const proxyBaseUrl = process.env.MOVESIA_AUTH_URL || 'https://movesia.com';
-  const defaultModel = process.env.MOVESIA_MODEL || 'minimax/minimax-m2.5:nitro';
+  const defaultModel = process.env.MOVESIA_MODEL || 'anthropic/claude-sonnet-4.6';
   log.info(
     `Creating model via proxy: ${proxyBaseUrl}/api/v1 ` +
       `(token: ${accessToken.slice(0, 8)}...${accessToken.slice(-4)}, len=${accessToken.length})`
@@ -248,8 +249,23 @@ export function createMovesiaAgent (options: CreateAgentOptions = {}) {
   }
   const toolNames = tools.map((t: any) => t.name).join(', ');
 
-  // Build system prompt with todo instructions appended
-  const systemPrompt = `${UNITY_AGENT_PROMPT}\n\n${todoMiddleware.systemPrompt}`;
+  // Build system prompt as SystemMessage with cache_control for Anthropic prompt caching.
+  // OpenRouter passes cache_control through to Anthropic, so the static system prompt
+  // and tool definitions get cached across requests — saving tokens on every turn.
+  const systemPrompt = new SystemMessage({
+    content: [
+      {
+        type: 'text' as const,
+        text: UNITY_AGENT_PROMPT,
+        cache_control: { type: 'ephemeral' as const },
+      },
+      {
+        type: 'text' as const,
+        text: todoMiddleware.systemPrompt,
+        cache_control: { type: 'ephemeral' as const },
+      },
+    ],
+  });
 
   // Build middleware stack (filesystem only — todo is injected directly)
   const middleware = createMiddlewareStack(projectPath);

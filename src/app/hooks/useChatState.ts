@@ -400,11 +400,12 @@ export function useChatState(options: UseChatStateOptions = {}): UseChatStateRet
     [messages, threadId, status]
   )
 
-  // Stop generation
+  // Stop generation — notify main process to abort the agent stream
   const stop = useCallback(() => {
-    log('Chat', 'Stop requested')
+    log('Chat', 'Stop requested — sending abort to main process')
     isStreamingRef.current = false
     setStatus('ready')
+    electron.ipcRenderer.invoke('chat:abort')
   }, [])
 
   const isLoading = status === 'submitted' || status === 'streaming'

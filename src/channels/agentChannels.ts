@@ -8,6 +8,7 @@
 export const AgentChannels = {
   // Chat
   CHAT_SEND: 'chat:send',
+  CHAT_ABORT: 'chat:abort',
   CHAT_STREAM_EVENT: 'chat:stream-event',
   CHAT_STREAM_ERROR: 'chat:stream-error',
 
@@ -27,6 +28,7 @@ export const AgentChannels = {
 /** Channels the renderer can invoke/send to the main process */
 export const AGENT_SEND_CHANNELS = [
   AgentChannels.CHAT_SEND,
+  AgentChannels.CHAT_ABORT,
   AgentChannels.THREADS_LIST,
   AgentChannels.THREADS_DELETE,
   AgentChannels.THREAD_MESSAGES,

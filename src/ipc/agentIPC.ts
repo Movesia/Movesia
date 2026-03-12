@@ -47,6 +47,12 @@ export function registerAgentIpc(
     }
   });
 
+  // ── Chat abort ────────────────────────────────────────────────────
+  ipcMain.handle(AgentChannels.CHAT_ABORT, () => {
+    log.info('[IPC] Chat abort requested by renderer');
+    agentService.abortChat();
+  });
+
   // ── Threads ─────────────────────────────────────────────────────────
   ipcMain.handle(AgentChannels.THREADS_LIST, (_event, projectPath?: string) =>
     agentService.listThreads(projectPath)

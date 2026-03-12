@@ -281,6 +281,7 @@ export class AgentService {
   private config: AgentServiceConfig
   private authService: AuthService | null = null
   private isInitialized = false
+  private currentAbortController: AbortController | null = null
 
   constructor(config: AgentServiceConfig) {
     this.config = config
@@ -505,6 +506,10 @@ export class AgentService {
     let toolCallCount = 0
     const startTime = Date.now()
 
+    // Create an AbortController so the renderer can cancel streaming
+    const abortController = new AbortController()
+    this.currentAbortController = abortController
+
     logger.info(`[Chat] Starting for thread=${threadId.slice(0, 16)}...`)
 
     try {
@@ -529,6 +534,7 @@ export class AgentService {
       const eventStream = await this.agent.streamEvents(inputData as any, {
         ...config,
         version: 'v2',
+        signal: abortController.signal,
       })
 
       let eventCount = 0
@@ -663,6 +669,21 @@ export class AgentService {
       return { threadId }
     } catch (error) {
       const duration = (Date.now() - startTime) / 1000
+      const isAborted = abortController.signal.aborted
+
+      if (isAborted) {
+        logger.info(`[Chat] Aborted by user after ${duration.toFixed(2)}s`)
+
+        if (hasTextContent) {
+          const textEnd = protocol.textEnd()
+          if (textEnd) onEvent(textEnd)
+        }
+        onEvent(protocol.finish())
+        onEvent(protocol.done())
+
+        return { threadId }
+      }
+
       const errorMessage =
         error instanceof Error ? error.message : String(error)
       logger.error(
@@ -677,6 +698,20 @@ export class AgentService {
       onEvent(protocol.done())
 
       throw error
+    } finally {
+      this.currentAbortController = null
+    }
+  }
+
+  /**
+   * Abort the currently running chat stream (if any).
+   */
+  abortChat(): void {
+    if (this.currentAbortController) {
+      logger.info('[Chat] Aborting current stream...')
+      this.currentAbortController.abort()
+    } else {
+      logger.debug('[Chat] No active stream to abort')
     }
   }
 

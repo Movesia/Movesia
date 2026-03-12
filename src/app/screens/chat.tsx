@@ -155,13 +155,14 @@ interface ChatScreenProps {
   status: ChatStatus
   error: Error | null
   onSendMessage: (content: string) => void
+  onStop?: () => void
 }
 
 // =============================================================================
 // ChatScreen
 // =============================================================================
 
-export function ChatScreen ({ messages, isLoading, status, error, onSendMessage }: ChatScreenProps) {
+export function ChatScreen ({ messages, isLoading, status, error, onSendMessage, onStop }: ChatScreenProps) {
   const [input, setInput] = useState('')
   const [files, setFiles] = useState<File[]>([])
   const [feedbackGiven, setFeedbackGiven] = useState<Set<string>>(new Set())
@@ -280,7 +281,7 @@ export function ChatScreen ({ messages, isLoading, status, error, onSendMessage 
           variant='default'
           size='icon'
           className='h-8 w-8 rounded-full'
-          onClick={handleSubmit}
+          onClick={isLoading ? onStop : handleSubmit}
         >
           {isLoading ? (
             <Square className='size-5 fill-current' />

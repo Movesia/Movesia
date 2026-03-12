@@ -187,6 +187,7 @@ function AppShell () {
                   status={chatState.status}
                   error={chatState.error}
                   onSendMessage={chatState.sendMessage}
+                  onStop={chatState.stop}
                 />
               }
             />

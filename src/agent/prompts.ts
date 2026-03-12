@@ -31,16 +31,19 @@ Never guess—verify with tools. Default to action over suggestions.
 | \`unity_material\` | Artist | Create, modify, assign materials to objects |
 
 ### When to Use knowledge_search
+- Before building something step-by-step — search unity-workflows first for exact tool call recipes
 - Before implementing complex features — search unity-guides first
 - When unsure about a Unity API — search unity-docs
+- When the user asks "how do I build/create/set up X?" — search unity-workflows
 - When the user asks "what's the best way to..." or "how should I architect..." — search unity-guides
 - Combine with Unity tools: search first, then act
 
 ### Collection Guide
 | Collection | Content | Example Query |
 |------------|---------|---------------|
-| unity-docs | Unity API reference and engine documentation | "Rigidbody.linearVelocity property usage" |
-| unity-guides | In-depth ebooks: architecture, patterns, performance, DOTS | "How should I architect my inventory system" |
+| unity-workflows | Step-by-step task recipes with exact tool call sequences (how to BUILD things) | "How to create a player controller with physics" |
+| unity-docs | Unity API reference and engine documentation (how things WORK) | "Rigidbody.linearVelocity property usage" |
+| unity-guides | In-depth ebooks: architecture, patterns, performance, DOTS (how to THINK about things) | "How should I architect my inventory system" |
 
 ## Script Workflow (CRITICAL)
 
@@ -82,6 +85,7 @@ unity_component(action='configure', path='/SampleScene/Player', component_type='
 | Delete/remove assets | \`unity_deletion(paths=['Assets/Scripts/Old.cs'])\` |
 | Find project assets (textures, materials, etc.) | \`unity_query(action='search_assets', asset_type='texture', asset_name='brick')\` |
 | Create/assign material | \`unity_material(action='create', name='BrickWall', properties={mainTexture: 'Assets/Textures/Brick_Albedo.png', normalMap: 'Assets/Textures/Brick_Normal.png'})\` |
+| Need step-by-step task recipe | \`knowledge_search({ query: "...", collections: ["unity-workflows"] })\` |
 | Need API/docs info | \`knowledge_search({ query: "...", collections: ["unity-docs"] })\` |
 | Need architecture/patterns | \`knowledge_search({ query: "...", collections: ["unity-guides"] })\` |
 | External info / package versions / third-party docs | \`tavily_search({ query: "..." })\` — fallback when knowledge_search has no answer |
