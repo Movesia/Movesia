@@ -14,6 +14,7 @@ import { join } from 'path'
 import { URL } from 'url'
 import * as dotenv from 'dotenv'
 import { HumanMessage } from '@langchain/core/messages'
+import { Command } from '@langchain/langgraph'
 import { createMovesiaAgent, type MovesiaAgent } from '../agent/agent'
 import type { QdrantConfig } from '../agent/knowledge-tools/index'
 import { UnityManager, createUnityManager } from '../agent/UnityConnection'
@@ -125,6 +126,7 @@ export type AgentEventType =
   | 'tool-input-delta'
   | 'tool-input-available'
   | 'tool-output-available'
+  | 'tool-approval-request'
   | 'finish-step'
   | 'finish'
   | 'error'
@@ -134,6 +136,24 @@ export interface AgentEvent {
   type: AgentEventType
   [key: string]: unknown
 }
+
+/**
+ * Shape of a single tool approval interrupt from our custom HITL middleware.
+ * Matches what `interrupt()` is called with in agent.ts.
+ */
+export interface ToolApprovalInterrupt {
+  type: 'tool-approval'
+  toolName: string
+  toolCallId: string
+  args: Record<string, unknown>
+}
+
+/**
+ * Decision from the user for a pending tool approval.
+ */
+export type ToolApprovalDecision =
+  | { type: 'approve' }
+  | { type: 'reject'; reason?: string }
 
 // UI Message Stream Protocol
 
@@ -201,6 +221,10 @@ class UIMessageStreamProtocol {
 
   error(message: string): AgentEvent {
     return { type: 'error', errorText: message }
+  }
+
+  toolApprovalRequest(interrupts: ToolApprovalInterrupt[]): AgentEvent {
+    return { type: 'tool-approval-request', interrupts }
   }
 
   done(): AgentEvent {
@@ -290,6 +314,10 @@ export class AgentService {
   private authService: AuthService | null = null
   private isInitialized = false
   private currentAbortController: AbortController | null = null
+  private pendingApproval: {
+    threadId: string
+    config: { configurable: { thread_id: string }; recursionLimit: number }
+  } | null = null
 
   constructor(config: AgentServiceConfig) {
     this.config = config
@@ -475,6 +503,173 @@ export class AgentService {
     })
   }
 
+  // ── Event Stream Processing (shared by handleChat + handleToolApprovalResponse) ──
+
+  /**
+   * Process a LangGraph event stream, emitting UI protocol events.
+   * Returns stream stats. Throws GraphInterrupt if HITL middleware pauses.
+   */
+  private async processEventStream(
+    eventStream: AsyncIterable<any>,
+    protocol: UIMessageStreamProtocol,
+    onEvent: (event: AgentEvent) => void,
+  ): Promise<{ eventCount: number; deltaCount: number; toolCallCount: number }> {
+    let hasTextContent = false
+    const currentToolCalls = new Map<string, string>()
+    let toolCallCount = 0
+    let eventCount = 0
+    let deltaCount = 0
+
+    for await (const event of eventStream) {
+      const kind = event.event
+      eventCount++
+
+      // Log every event type for diagnostics (first 20 + summary)
+      if (eventCount <= 20) {
+        logger.debug(
+          `[Stream] #${eventCount} event="${kind}" name="${event.name ?? ''}"` +
+          (kind === 'on_chat_model_stream'
+            ? ` contentType=${typeof event.data?.chunk?.content} contentLen=${
+                typeof event.data?.chunk?.content === 'string'
+                  ? event.data.chunk.content.length
+                  : Array.isArray(event.data?.chunk?.content)
+                    ? `array[${event.data.chunk.content.length}]`
+                    : 'n/a'
+              }`
+            : '')
+        )
+      } else if (eventCount === 21) {
+        logger.debug('[Stream] (suppressing further per-event logs)')
+      }
+
+      if (kind === 'on_chat_model_stream') {
+        const chunk = event.data?.chunk
+        if (chunk && chunk.content) {
+          const content = chunk.content
+
+          if (typeof content === 'string' && content) {
+            deltaCount++
+            if (!hasTextContent) {
+              logger.debug(`[Stream] First text-delta at event #${eventCount}, emitting text-start`)
+              onEvent(protocol.textStart())
+              hasTextContent = true
+            }
+            const delta = protocol.textDelta(content)
+            if (delta) onEvent(delta)
+          } else if (Array.isArray(content)) {
+            for (const block of content) {
+              let text = ''
+              if (
+                typeof block === 'object' &&
+                block !== null &&
+                block.type === 'text'
+              ) {
+                text = (block as { type: string; text?: string }).text || ''
+              } else if (typeof block === 'string') {
+                text = block
+              }
+
+              if (text) {
+                deltaCount++
+                if (!hasTextContent) {
+                  logger.debug(`[Stream] First text-delta (array) at event #${eventCount}, emitting text-start`)
+                  onEvent(protocol.textStart())
+                  hasTextContent = true
+                }
+                const delta = protocol.textDelta(text)
+                if (delta) onEvent(delta)
+              }
+            }
+          }
+        }
+      } else if (kind === 'on_tool_start') {
+        if (hasTextContent) {
+          const textEnd = protocol.textEnd()
+          if (textEnd) onEvent(textEnd)
+          hasTextContent = false
+        }
+
+        const toolName = event.name || 'unknown'
+        const rawToolInput = event.data?.input || {}
+        const toolCallId = event.run_id || randomUUID()
+        toolCallCount++
+
+        logger.info(`[Tool #${toolCallCount}] START: ${toolName}`)
+
+        const toolInput = unwrapToolInput(rawToolInput)
+        currentToolCalls.set(toolCallId, toolName)
+
+        onEvent(protocol.toolInputStart(toolCallId, toolName))
+        const serializedInput = safeSerialize(toolInput)
+        onEvent(
+          protocol.toolInputDelta(toolCallId, JSON.stringify(serializedInput))
+        )
+        onEvent(
+          protocol.toolInputAvailable(toolCallId, toolName, serializedInput)
+        )
+      } else if (kind === 'on_tool_end') {
+        const toolCallId = event.run_id || ''
+        const toolOutput = event.data?.output
+        const toolName = currentToolCalls.get(toolCallId) || 'unknown'
+
+        logger.info(`[Tool] END: ${toolName}`)
+
+        const truncatedOutput = truncateOutput(toolOutput)
+        onEvent(protocol.toolOutputAvailable(toolCallId, truncatedOutput))
+
+        currentToolCalls.delete(toolCallId)
+        onEvent(protocol.finishStep())
+      }
+    }
+
+    if (hasTextContent) {
+      const textEnd = protocol.textEnd()
+      if (textEnd) onEvent(textEnd)
+    }
+
+    return { eventCount, deltaCount, toolCallCount }
+  }
+
+  // ── HITL Interrupt Detection ──
+
+  /**
+   * Check the graph state for pending interrupts after a stream completes.
+   * streamEvents() catches GraphInterrupt internally (doesn't re-throw),
+   * so we inspect the checkpoint state to detect pending tool approvals.
+   */
+  private async checkForPendingInterrupts(
+    threadId: string,
+    config: { configurable: { thread_id: string }; recursionLimit: number },
+    protocol: UIMessageStreamProtocol,
+    onEvent: (event: AgentEvent) => void,
+  ): Promise<{ threadId: string; pendingApproval: true } | null> {
+    if (!this.agent) return null
+
+    try {
+      const state = await (this.agent as any).getState(config)
+      const tasks: any[] = state?.tasks ?? []
+      const interrupts: ToolApprovalInterrupt[] = tasks
+        .flatMap((t: any) => t.interrupts ?? [])
+        .map((i: any) => i.value)
+        .filter((v: any) => v?.type === 'tool-approval')
+
+      if (interrupts.length === 0) return null
+
+      logger.info(
+        `[HITL] Pending interrupts detected: ${interrupts.length} tool(s) ` +
+        `[${interrupts.map(i => i.toolName).join(', ')}]`
+      )
+
+      this.pendingApproval = { threadId, config }
+      onEvent(protocol.toolApprovalRequest(interrupts))
+
+      return { threadId, pendingApproval: true }
+    } catch (err) {
+      logger.warn(`[HITL] Failed to check graph state: ${(err as Error).message}`)
+      return null
+    }
+  }
+
   /**
    * Handle a chat request from the renderer.
    * Streams events back via the callback.
@@ -482,7 +677,7 @@ export class AgentService {
   async handleChat(
     request: ChatRequest,
     onEvent: (event: AgentEvent) => void
-  ): Promise<{ threadId: string }> {
+  ): Promise<{ threadId: string; pendingApproval?: boolean }> {
     if (!this.agent) {
       const errorMsg = this.authService
         ? 'Please sign in to use the agent'
@@ -508,10 +703,6 @@ export class AgentService {
     }
 
     const userText = lastMessage.content
-
-    let hasTextContent = false
-    const currentToolCalls = new Map<string, string>()
-    let toolCallCount = 0
     const startTime = Date.now()
 
     // Create an AbortController so the renderer can cancel streaming
@@ -545,120 +736,17 @@ export class AgentService {
         signal: abortController.signal,
       })
 
-      let eventCount = 0
-      let deltaCount = 0
-
-      for await (const event of eventStream) {
-        const kind = event.event
-        eventCount++
-
-        // Log every event type for diagnostics (first 20 + summary)
-        if (eventCount <= 20) {
-          logger.debug(
-            `[Stream] #${eventCount} event="${kind}" name="${event.name ?? ''}"` +
-            (kind === 'on_chat_model_stream'
-              ? ` contentType=${typeof event.data?.chunk?.content} contentLen=${
-                  typeof event.data?.chunk?.content === 'string'
-                    ? event.data.chunk.content.length
-                    : Array.isArray(event.data?.chunk?.content)
-                      ? `array[${event.data.chunk.content.length}]`
-                      : 'n/a'
-                }`
-              : '')
-          )
-        } else if (eventCount === 21) {
-          logger.debug('[Stream] (suppressing further per-event logs)')
-        }
-
-        if (kind === 'on_chat_model_stream') {
-          const chunk = event.data?.chunk
-          if (chunk && chunk.content) {
-            const content = chunk.content
-
-            if (typeof content === 'string' && content) {
-              deltaCount++
-              if (!hasTextContent) {
-                logger.debug(`[Stream] First text-delta at event #${eventCount}, emitting text-start`)
-                onEvent(protocol.textStart())
-                hasTextContent = true
-              }
-              const delta = protocol.textDelta(content)
-              if (delta) onEvent(delta)
-            } else if (Array.isArray(content)) {
-              for (const block of content) {
-                let text = ''
-                if (
-                  typeof block === 'object' &&
-                  block !== null &&
-                  block.type === 'text'
-                ) {
-                  text = (block as { type: string; text?: string }).text || ''
-                } else if (typeof block === 'string') {
-                  text = block
-                }
-
-                if (text) {
-                  deltaCount++
-                  if (!hasTextContent) {
-                    logger.debug(`[Stream] First text-delta (array) at event #${eventCount}, emitting text-start`)
-                    onEvent(protocol.textStart())
-                    hasTextContent = true
-                  }
-                  const delta = protocol.textDelta(text)
-                  if (delta) onEvent(delta)
-                }
-              }
-            }
-          }
-        } else if (kind === 'on_tool_start') {
-          if (hasTextContent) {
-            const textEnd = protocol.textEnd()
-            if (textEnd) onEvent(textEnd)
-            hasTextContent = false
-          }
-
-          const toolName = event.name || 'unknown'
-          const rawToolInput = event.data?.input || {}
-          const toolCallId = event.run_id || randomUUID()
-          toolCallCount++
-
-          logger.info(`[Tool #${toolCallCount}] START: ${toolName}`)
-
-          const toolInput = unwrapToolInput(rawToolInput)
-          currentToolCalls.set(toolCallId, toolName)
-
-          onEvent(protocol.toolInputStart(toolCallId, toolName))
-          const serializedInput = safeSerialize(toolInput)
-          onEvent(
-            protocol.toolInputDelta(toolCallId, JSON.stringify(serializedInput))
-          )
-          onEvent(
-            protocol.toolInputAvailable(toolCallId, toolName, serializedInput)
-          )
-        } else if (kind === 'on_tool_end') {
-          const toolCallId = event.run_id || ''
-          const toolOutput = event.data?.output
-          const toolName = currentToolCalls.get(toolCallId) || 'unknown'
-
-          logger.info(`[Tool] END: ${toolName}`)
-
-          const truncatedOutput = truncateOutput(toolOutput)
-          onEvent(protocol.toolOutputAvailable(toolCallId, truncatedOutput))
-
-          currentToolCalls.delete(toolCallId)
-          onEvent(protocol.finishStep())
-        }
-      }
-
-      if (hasTextContent) {
-        const textEnd = protocol.textEnd()
-        if (textEnd) onEvent(textEnd)
-      }
+      const stats = await this.processEventStream(eventStream, protocol, onEvent)
 
       const duration = (Date.now() - startTime) / 1000
       logger.info(
-        `[Chat] Complete: ${eventCount} events, ${deltaCount} text-deltas, ${toolCallCount} tools in ${duration.toFixed(2)}s`
+        `[Chat] Complete: ${stats.eventCount} events, ${stats.deltaCount} text-deltas, ${stats.toolCallCount} tools in ${duration.toFixed(2)}s`
       )
+
+      // Check graph state for pending interrupts (wrapToolCall interrupt()
+      // doesn't throw from streamEvents — it ends the stream gracefully)
+      const hitlResult = await this.checkForPendingInterrupts(threadId, config, protocol, onEvent)
+      if (hitlResult) return hitlResult
 
       // Update conversation metadata
       if (this.repository) {
@@ -681,14 +769,8 @@ export class AgentService {
 
       if (isAborted) {
         logger.info(`[Chat] Aborted by user after ${duration.toFixed(2)}s`)
-
-        if (hasTextContent) {
-          const textEnd = protocol.textEnd()
-          if (textEnd) onEvent(textEnd)
-        }
         onEvent(protocol.finish())
         onEvent(protocol.done())
-
         return { threadId }
       }
 
@@ -698,10 +780,83 @@ export class AgentService {
         `[Chat] ERROR after ${duration.toFixed(2)}s: ${errorMessage}`
       )
 
-      if (hasTextContent) {
-        const textEnd = protocol.textEnd()
-        if (textEnd) onEvent(textEnd)
+      onEvent(protocol.error(errorMessage))
+      onEvent(protocol.done())
+
+      throw error
+    } finally {
+      this.currentAbortController = null
+    }
+  }
+
+  /**
+   * Handle the user's approval/rejection response for a pending HITL interrupt.
+   * Resumes the agent from the checkpoint with the user's decisions.
+   */
+  async handleToolApprovalResponse(
+    threadId: string,
+    decision: ToolApprovalDecision,
+    onEvent: (event: AgentEvent) => void,
+  ): Promise<{ threadId: string; pendingApproval?: boolean }> {
+    if (!this.agent) {
+      throw new Error('Agent not initialized')
+    }
+
+    if (!this.pendingApproval || this.pendingApproval.threadId !== threadId) {
+      throw new Error(`No pending approval for thread ${threadId}`)
+    }
+
+    const config = this.pendingApproval.config
+    this.pendingApproval = null
+
+    logger.info(`[HITL] Resuming thread=${threadId.slice(0, 16)}... decision=${decision.type}`)
+
+    const protocol = new UIMessageStreamProtocol()
+    const abortController = new AbortController()
+    this.currentAbortController = abortController
+
+    try {
+      // Resume the graph — interrupt() returns this value to the wrapToolCall hook
+      const resumeCommand = new Command({ resume: decision })
+
+      const eventStream = await this.agent.streamEvents(resumeCommand as any, {
+        ...config,
+        version: 'v2',
+        signal: abortController.signal,
+      })
+
+      const stats = await this.processEventStream(eventStream, protocol, onEvent)
+
+      logger.info(
+        `[HITL] Resume complete: ${stats.eventCount} events, ${stats.toolCallCount} tools`
+      )
+
+      // Check for chained interrupts (next tool needing approval)
+      const hitlResult = await this.checkForPendingInterrupts(threadId, config, protocol, onEvent)
+      if (hitlResult) return hitlResult
+
+      // Update conversation metadata
+      if (this.repository) {
+        await this.repository.touch(threadId)
       }
+
+      onEvent(protocol.finish())
+      onEvent(protocol.done())
+
+      return { threadId }
+    } catch (error) {
+      const isAborted = abortController.signal.aborted
+
+      if (isAborted) {
+        logger.info('[HITL] Aborted by user during resume')
+        onEvent(protocol.finish())
+        onEvent(protocol.done())
+        return { threadId }
+      }
+
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      logger.error(`[HITL] Resume error: ${errorMessage}`)
+
       onEvent(protocol.error(errorMessage))
       onEvent(protocol.done())
 
@@ -713,6 +868,7 @@ export class AgentService {
 
   /**
    * Abort the currently running chat stream (if any).
+   * Also clears any pending HITL approval state.
    */
   abortChat(): void {
     if (this.currentAbortController) {
@@ -721,6 +877,7 @@ export class AgentService {
     } else {
       logger.debug('[Chat] No active stream to abort')
     }
+    this.pendingApproval = null
   }
 
   getUnityStatus(): {

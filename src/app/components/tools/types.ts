@@ -5,7 +5,7 @@ import type { ComponentType } from 'react'
 // =============================================================================
 
 /** Tool execution states — matches the streaming lifecycle */
-export type ToolCallState = 'streaming' | 'executing' | 'completed' | 'error'
+export type ToolCallState = 'streaming' | 'executing' | 'pending_approval' | 'completed' | 'error'
 
 /** Core tool call data passed to all tool UI components */
 export interface ToolCallData {

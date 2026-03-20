@@ -22,6 +22,7 @@ const ALLOWED_SEND_CHANNELS = [
   // Agent channels (renderer → main)
   'chat:send',
   'chat:abort',
+  'chat:tool-approval-response',
   'threads:list',
   'threads:delete',
   'threads:messages',

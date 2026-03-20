@@ -53,6 +53,26 @@ export function registerAgentIpc(
     agentService.abortChat();
   });
 
+  // ── Tool approval response (HITL) ─────────────────────────────────
+  ipcMain.handle(AgentChannels.CHAT_TOOL_APPROVAL_RESPONSE, async (_event, payload) => {
+    const { threadId, decision } = payload;
+    log.info(`[IPC] Tool approval response: thread=${threadId?.slice(0, 16)}... decision=${decision?.type}`);
+    try {
+      return await agentService.handleToolApprovalResponse(threadId, decision, (event) => {
+        if (!mainWindow.isDestroyed()) {
+          mainWindow.webContents.send(AgentChannels.CHAT_STREAM_EVENT, event);
+        }
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      log.error(`[IPC] Tool approval error: ${message}`);
+      if (!mainWindow.isDestroyed()) {
+        mainWindow.webContents.send(AgentChannels.CHAT_STREAM_ERROR, message);
+      }
+      throw error;
+    }
+  });
+
   // ── Threads ─────────────────────────────────────────────────────────
   ipcMain.handle(AgentChannels.THREADS_LIST, (_event, projectPath?: string) =>
     agentService.listThreads(projectPath)

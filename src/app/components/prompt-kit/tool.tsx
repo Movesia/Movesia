@@ -1,13 +1,14 @@
 "use client"
 
 import * as React from "react"
-import { ChevronRight, Loader2, CheckCircle2, XCircle, Wrench } from "lucide-react"
+import { ChevronRight, Loader2, CheckCircle2, XCircle, Wrench, ShieldAlert } from "lucide-react"
 import { cn } from "@/app/lib/utils"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/app/components/ui/collapsible"
+import { Button } from "@/app/components/ui/button"
 
 // =============================================================================
 // ToolPart — the data shape describing a single tool invocation
@@ -40,6 +41,10 @@ interface ToolProps {
   defaultOpen?: boolean
   /** Additional CSS classes */
   className?: string
+  /** Called when user approves the pending tool */
+  onApprove?: () => void
+  /** Called when user rejects the pending tool */
+  onReject?: () => void
 }
 
 function formatToolName(name: string): string {
@@ -65,6 +70,8 @@ function StateIcon({ state }: { state: string }) {
   switch (state) {
     case "running":
       return <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
+    case "pending_approval":
+      return <ShieldAlert className="size-3.5 text-amber-500" />
     case "complete":
       return <CheckCircle2 className="size-3.5 text-emerald-500" />
     case "error":
@@ -74,15 +81,22 @@ function StateIcon({ state }: { state: string }) {
   }
 }
 
-function Tool({ toolPart, defaultOpen = false, className }: ToolProps) {
-  const [isOpen, setIsOpen] = React.useState(defaultOpen)
+function Tool({ toolPart, defaultOpen = false, className, onApprove, onReject }: ToolProps) {
+  const isPendingApproval = toolPart.state === "pending_approval"
+  const [isOpen, setIsOpen] = React.useState(defaultOpen || isPendingApproval)
   const isRunning = toolPart.state === "running"
+
+  // Auto-expand when approval is needed
+  React.useEffect(() => {
+    if (isPendingApproval) setIsOpen(true)
+  }, [isPendingApproval])
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <div
         className={cn(
           "rounded-lg border bg-card text-card-foreground overflow-hidden transition-colors",
+          isPendingApproval && "border-amber-500/40 shadow-sm shadow-amber-500/10",
           isRunning && "border-muted-foreground/30",
           toolPart.state === "error" && "border-destructive/40",
           className
@@ -103,9 +117,14 @@ function Tool({ toolPart, defaultOpen = false, className }: ToolProps) {
                 isOpen && "rotate-90"
               )}
             />
-            <Wrench className="size-3.5 text-muted-foreground shrink-0" />
+            <Wrench className={cn("size-3.5 shrink-0", isPendingApproval ? "text-amber-500" : "text-muted-foreground")} />
             <span className="text-xs font-medium flex-1 truncate">
               {formatToolName(toolPart.type)}
+              {isPendingApproval && (
+                <span className="ml-2 text-[10px] font-normal text-amber-500">
+                  Pending Approval
+                </span>
+              )}
             </span>
             <StateIcon state={toolPart.state} />
           </button>
@@ -155,6 +174,36 @@ function Tool({ toolPart, defaultOpen = false, className }: ToolProps) {
               <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
                 <Loader2 className="size-3 animate-spin" />
                 <span>Running...</span>
+              </div>
+            )}
+
+            {/* Approval action bar */}
+            {isPendingApproval && onApprove && onReject && (
+              <div className="flex items-center gap-2 mt-1 pt-2.5 border-t border-border">
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="bg-green-600 hover:bg-green-700 text-white h-7 text-xs"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onApprove()
+                  }}
+                >
+                  <CheckCircle2 className="size-3 mr-1" />
+                  Approve
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-red-500/50 text-red-500 hover:bg-red-500/10 hover:text-red-400 h-7 text-xs"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onReject()
+                  }}
+                >
+                  <XCircle className="size-3 mr-1" />
+                  Reject
+                </Button>
               </div>
             )}
           </div>

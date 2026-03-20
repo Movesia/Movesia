@@ -11,10 +11,10 @@
 import { createHash } from 'crypto';
 import { resolve } from 'path';
 import { ChatOpenAI } from '@langchain/openai';
-import { MemorySaver } from '@langchain/langgraph';
+import { MemorySaver, interrupt } from '@langchain/langgraph';
 import type { BaseCheckpointSaver } from '@langchain/langgraph';
 import type { BaseStore } from '@langchain/langgraph-checkpoint';
-import { SystemMessage } from '@langchain/core/messages';
+import { SystemMessage, ToolMessage } from '@langchain/core/messages';
 import { unityTools, setUnityManager } from './unity-tools/index';
 import { createInternetSearch, knowledgeSearch, setQdrantConfig } from './knowledge-tools/index';
 import type { QdrantConfig } from './knowledge-tools/index';
@@ -22,7 +22,7 @@ import { UNITY_AGENT_PROMPT } from './prompts';
 import type { UnityManager } from './UnityConnection/index';
 import { createLogger } from './UnityConnection/config';
 
-import { createAgent } from 'langchain';
+import { createAgent, createMiddleware } from 'langchain';
 import {
   createFilesystemMiddleware,
   CompositeBackend,
@@ -85,28 +85,29 @@ export const UNITY_PROJECT_PATH_RESOLVED = _unityProjectPath ? resolve(_unityPro
 // =============================================================================
 
 /**
- * Create the ChatOpenAI model routed through the Movesia proxy.
+ * Create the ChatOpenAI model.
  *
- * The proxy validates the OAuth access token, forwards to OpenRouter with
- * the server-side API key, and logs usage analytics.
+ * Currently configured to hit Fireworks AI directly for testing.
+ * To revert to the Movesia proxy, restore the proxy baseURL and use
+ * the OAuth access token as apiKey.
  *
- * @param accessToken - Required OAuth access token (sent as Authorization: Bearer)
- * @param modelName - OpenRouter model identifier (default: anthropic/claude-haiku-4.5)
+ * @param accessToken - OAuth access token (unused when hitting Fireworks directly)
+ * @param modelName - Model identifier (default: accounts/fireworks/models/deepseek-v3)
  */
 export function createModel (accessToken: string, modelName?: string) {
-  const proxyBaseUrl = process.env.MOVESIA_AUTH_URL || 'https://movesia.com';
-  const defaultModel = process.env.MOVESIA_MODEL || 'anthropic/claude-sonnet-4.6';
-  log.info(
-    `Creating model via proxy: ${proxyBaseUrl}/api/v1 ` +
-      `(token: ${accessToken.slice(0, 8)}...${accessToken.slice(-4)}, len=${accessToken.length})`
-  );
+  const fireworksApiKey = process.env.FIREWORKS_API_KEY || '';
+  const defaultModel = process.env.MOVESIA_MODEL || 'accounts/fireworks/models/minimax-m2p5';
+  const resolvedModel = modelName ?? defaultModel;
+
+  log.info(`Creating model via Fireworks AI: ${resolvedModel} ` + `(key: ${fireworksApiKey.slice(0, 8)}...)`);
+
   return new ChatOpenAI({
-    modelName: modelName ?? defaultModel,
+    modelName: resolvedModel,
     streaming: true,
     configuration: {
-      baseURL: `${proxyBaseUrl}/api/v1`,
+      baseURL: 'https://api.fireworks.ai/inference/v1',
     },
-    apiKey: accessToken, // OAuth access token — validated server-side by the proxy
+    apiKey: fireworksApiKey,
   });
 }
 
@@ -147,11 +148,75 @@ function projectNamespaceHash (projectPath: string): string {
  */
 const todoMiddleware = new OptimizedTodoMiddleware({ mode: 'balanced' });
 
+// =============================================================================
+// HUMAN-IN-THE-LOOP CONFIGURATION
+// =============================================================================
+
+/**
+ * Tools that require user approval before execution.
+ * Uses a Set for O(1) lookup in the wrapToolCall hook.
+ */
+const APPROVAL_REQUIRED_TOOLS = new Set([
+  'write_file',
+  'edit_file',
+  'unity_deletion',
+]);
+
+/**
+ * Custom HITL middleware using wrapToolCall.
+ *
+ * Why not humanInTheLoopMiddleware?
+ * The built-in afterModel-based middleware mutates AIMessage.tool_calls in-place
+ * before the graph's routing decision, breaking model → tools routing entirely.
+ * Additionally, write_file/edit_file are injected by createFilesystemMiddleware
+ * (not in the direct tools array), so the afterModel approach can't find them.
+ *
+ * wrapToolCall runs INSIDE the ToolNode (after routing), so it:
+ * - Cannot break model → tools routing
+ * - Works with middleware-injected tools (filesystem tools)
+ * - Intercepts each tool call individually
+ */
+const hitlMiddleware = createMiddleware({
+  name: 'MovesiaHITL',
+  wrapToolCall: async (request: any, handler: any) => {
+    const toolName: string = request.toolCall.name;
+
+    if (!APPROVAL_REQUIRED_TOOLS.has(toolName)) {
+      // Auto-execute: read-only and Unity scene tools
+      return handler(request);
+    }
+
+    // Mutating tool — interrupt for user approval
+    log.info(`[HITL] Interrupting for approval: ${toolName} (id=${request.toolCall.id})`);
+
+    const decision = interrupt({
+      type: 'tool-approval',
+      toolName,
+      toolCallId: request.toolCall.id,
+      args: request.toolCall.args,
+    });
+
+    // interrupt() returns the resume value after user responds
+    if (decision && (decision as any).type === 'reject') {
+      const reason = (decision as any).reason || 'Rejected by user';
+      log.info(`[HITL] Rejected: ${toolName} — ${reason}`);
+      return new ToolMessage({
+        content: `Tool "${toolName}" was rejected: ${reason}`,
+        tool_call_id: request.toolCall.id,
+      });
+    }
+
+    // Approved — execute the tool
+    log.info(`[HITL] Approved: ${toolName}`);
+    return handler(request);
+  },
+});
+
 /**
  * Create the middleware stack for the agent.
  * Note: The todo middleware is no longer a LangGraph middleware —
  * its tool and system prompt are injected directly into the agent.
- * Only the filesystem middleware uses the middleware[] parameter.
+ * Includes filesystem middleware and HITL middleware.
  */
 function createMiddlewareStack (projectPath?: string): any[] {
   const middleware: any[] = [];
@@ -184,6 +249,10 @@ function createMiddlewareStack (projectPath?: string): any[] {
   } else {
     log.warn('No projectPath — filesystem middleware skipped');
   }
+
+  // HITL middleware — uses wrapToolCall to intercept mutating tools
+  middleware.push(hitlMiddleware);
+  names.push('hitl');
 
   log.debug(`Middleware: [${names.join(', ')}]`);
   return middleware;
@@ -249,23 +318,27 @@ export function createMovesiaAgent (options: CreateAgentOptions = {}) {
   }
   const toolNames = tools.map((t: any) => t.name).join(', ');
 
-  // Build system prompt as SystemMessage with cache_control for Anthropic prompt caching.
-  // OpenRouter passes cache_control through to Anthropic, so the static system prompt
-  // and tool definitions get cached across requests — saving tokens on every turn.
+  // Build system prompt.
+  // For non-Anthropic providers (Fireworks, etc.), use a plain string.
   const systemPrompt = new SystemMessage({
-    content: [
-      {
-        type: 'text' as const,
-        text: UNITY_AGENT_PROMPT,
-        cache_control: { type: 'ephemeral' as const },
-      },
-      {
-        type: 'text' as const,
-        text: todoMiddleware.systemPrompt,
-        cache_control: { type: 'ephemeral' as const },
-      },
-    ],
+    content: `${UNITY_AGENT_PROMPT}\n\n${todoMiddleware.systemPrompt}`,
   });
+
+  // --- ANTHROPIC PROMPT CACHING (restore when switching back to OpenRouter/Anthropic) ---
+  // const systemPrompt = new SystemMessage({
+  //   content: [
+  //     {
+  //       type: 'text' as const,
+  //       text: UNITY_AGENT_PROMPT,
+  //       cache_control: { type: 'ephemeral' as const },
+  //     },
+  //     {
+  //       type: 'text' as const,
+  //       text: todoMiddleware.systemPrompt,
+  //       cache_control: { type: 'ephemeral' as const },
+  //     },
+  //   ],
+  // });
 
   // Build middleware stack (filesystem only — todo is injected directly)
   const middleware = createMiddlewareStack(projectPath);
@@ -290,7 +363,6 @@ export function createMovesiaAgent (options: CreateAgentOptions = {}) {
     checkpointer,
     store,
   });
-
   log.info('Agent created');
 
   return agent;

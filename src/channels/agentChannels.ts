@@ -11,6 +11,7 @@ export const AgentChannels = {
   CHAT_ABORT: 'chat:abort',
   CHAT_STREAM_EVENT: 'chat:stream-event',
   CHAT_STREAM_ERROR: 'chat:stream-error',
+  CHAT_TOOL_APPROVAL_RESPONSE: 'chat:tool-approval-response',
 
   // Threads
   THREADS_LIST: 'threads:list',
@@ -29,6 +30,7 @@ export const AgentChannels = {
 export const AGENT_SEND_CHANNELS = [
   AgentChannels.CHAT_SEND,
   AgentChannels.CHAT_ABORT,
+  AgentChannels.CHAT_TOOL_APPROVAL_RESPONSE,
   AgentChannels.THREADS_LIST,
   AgentChannels.THREADS_DELETE,
   AgentChannels.THREAD_MESSAGES,

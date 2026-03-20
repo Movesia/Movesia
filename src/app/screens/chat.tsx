@@ -109,18 +109,24 @@ const AssistantMessage = memo(function AssistantMessage({
   isLastAssistant,
   feedbackGiven,
   onFeedback,
+  onApprove,
+  onReject,
 }: {
   message: ChatMessage
   isStreaming: boolean
   isLastAssistant: boolean
   feedbackGiven: boolean
   onFeedback: () => void
+  onApprove?: () => void
+  onReject?: () => void
 }) {
   // Defer content so markdown parsing is low-priority during streaming
   const deferredContent = useDeferredValue(message.content)
   // Use deferred value only while streaming; once done, use actual content immediately
   const content = isStreaming ? deferredContent : message.content
   const segments = buildSegments(content, message.toolParts)
+
+  const hasPendingApproval = message.toolParts?.some(t => t.state === 'pending_approval')
 
   return (
     <div className='py-1'>
@@ -129,7 +135,12 @@ const AssistantMessage = memo(function AssistantMessage({
           <Markdown key={`text-${i}`} id={`${message.id}-${i}`}>{seg.content}</Markdown>
         ) : (
           <div key={seg.toolPart.toolCallId || `tool-${i}`} className='my-2'>
-            <Tool toolPart={seg.toolPart} defaultOpen={false} />
+            <Tool
+              toolPart={seg.toolPart}
+              defaultOpen={false}
+              onApprove={hasPendingApproval ? onApprove : undefined}
+              onReject={hasPendingApproval ? onReject : undefined}
+            />
           </div>
         )
       )}
@@ -156,25 +167,28 @@ interface ChatScreenProps {
   error: Error | null
   onSendMessage: (content: string) => void
   onStop?: () => void
+  onApproveAll?: () => void
+  onRejectAll?: (reason?: string) => void
 }
 
 // =============================================================================
 // ChatScreen
 // =============================================================================
 
-export function ChatScreen ({ messages, isLoading, status, error, onSendMessage, onStop }: ChatScreenProps) {
+export function ChatScreen ({ messages, isLoading, status, error, onSendMessage, onStop, onApproveAll, onRejectAll }: ChatScreenProps) {
+  const isAwaitingApproval = status === 'awaiting_approval'
   const [input, setInput] = useState('')
   const [files, setFiles] = useState<File[]>([])
   const [feedbackGiven, setFeedbackGiven] = useState<Set<string>>(new Set())
   const uploadInputRef = useRef<HTMLInputElement>(null)
 
   const handleSubmit = useCallback(() => {
-    if ((!input.trim() && files.length === 0) || isLoading) return
+    if ((!input.trim() && files.length === 0) || isLoading || isAwaitingApproval) return
 
     onSendMessage(input.trim())
     setInput('')
     setFiles([])
-  }, [input, files, isLoading, onSendMessage])
+  }, [input, files, isLoading, isAwaitingApproval, onSendMessage])
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
@@ -345,6 +359,8 @@ export function ChatScreen ({ messages, isLoading, status, error, onSendMessage,
                 isLastAssistant={isLastAssistant}
                 feedbackGiven={feedbackGiven.has(msg.id)}
                 onFeedback={() => setFeedbackGiven((prev) => new Set(prev).add(msg.id))}
+                onApprove={isAwaitingApproval ? onApproveAll : undefined}
+                onReject={isAwaitingApproval ? () => onRejectAll?.() : undefined}
               />
             )
           })}

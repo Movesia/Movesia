@@ -42,7 +42,7 @@ export interface ChatMessage {
 }
 
 /** Chat status */
-export type ChatStatus = 'ready' | 'submitted' | 'streaming' | 'error'
+export type ChatStatus = 'ready' | 'submitted' | 'streaming' | 'awaiting_approval' | 'error'
 
 /** Agent event from main process */
 interface AgentEvent {
@@ -67,6 +67,14 @@ export interface UseChatStateOptions {
   onToolCallEvent?: (event: ToolCallEvent, messageId: string) => void
 }
 
+/** HITL interrupt from the custom wrapToolCall middleware */
+export interface ToolApprovalInterrupt {
+  type: 'tool-approval'
+  toolName: string
+  toolCallId: string
+  args: Record<string, unknown>
+}
+
 /** Return type for useChatState hook */
 export interface UseChatStateReturn {
   messages: ChatMessage[]
@@ -78,6 +86,12 @@ export interface UseChatStateReturn {
   threadId: string | null
   setThreadId: (id: string | null) => void
   isLoading: boolean
+  /** Approve all pending tool calls */
+  approveAllTools: () => void
+  /** Reject all pending tool calls with an optional reason */
+  rejectAllTools: (reason?: string) => void
+  /** Pending tool approval interrupts (populated when status === 'awaiting_approval') */
+  pendingInterrupts: ToolApprovalInterrupt[]
 }
 
 // =============================================================================
@@ -102,6 +116,8 @@ export function useChatState(options: UseChatStateOptions = {}): UseChatStateRet
   // rAF batching: accumulate deltas and flush at ~60fps instead of per-token
   const rafIdRef = useRef<number | null>(null)
   const pendingTextFlushRef = useRef<boolean>(false)
+  // HITL: pending tool approval interrupts waiting for user decision
+  const [pendingInterrupts, setPendingInterrupts] = useState<ToolApprovalInterrupt[]>([])
 
   // Listen to stream events from main process
   useEffect(() => {
@@ -251,6 +267,50 @@ export function useChatState(options: UseChatStateOptions = {}): UseChatStateRet
               currentMessageIdRef.current
             )
           }
+          break
+        }
+
+        case 'tool-approval-request': {
+          const interrupts = agentEvent.interrupts as ToolApprovalInterrupt[]
+          log('Chat', `Tool approval request: ${interrupts.length} tool(s)`, interrupts)
+
+          // Update matching tool parts to 'pending_approval' using toolCallId
+          for (const intr of interrupts) {
+            const existing = toolCallsRef.current.get(intr.toolCallId)
+            if (existing) {
+              toolCallsRef.current.set(intr.toolCallId, {
+                ...existing,
+                state: 'pending_approval',
+                input: intr.args,
+              })
+            } else {
+              // Tool input events may not have fired yet — create from interrupt
+              toolCallsRef.current.set(intr.toolCallId, {
+                type: intr.toolName,
+                state: 'pending_approval',
+                toolCallId: intr.toolCallId,
+                input: intr.args,
+                textOffsetStart: accumulatedTextRef.current.length,
+              })
+            }
+          }
+
+          // Update messages to reflect pending state
+          setMessages(prev => {
+            const msgs = [...prev]
+            const lastIdx = msgs.length - 1
+            if (lastIdx >= 0 && msgs[lastIdx].role === 'assistant') {
+              msgs[lastIdx] = {
+                ...msgs[lastIdx],
+                toolParts: Array.from(toolCallsRef.current.values()),
+              }
+            }
+            return msgs
+          })
+
+          setPendingInterrupts(interrupts)
+          setStatus('awaiting_approval')
+          isStreamingRef.current = false
           break
         }
 
@@ -404,9 +464,89 @@ export function useChatState(options: UseChatStateOptions = {}): UseChatStateRet
   const stop = useCallback(() => {
     log('Chat', 'Stop requested — sending abort to main process')
     isStreamingRef.current = false
+    setPendingInterrupts([])
     setStatus('ready')
     electron.ipcRenderer.invoke('chat:abort')
   }, [])
+
+  // HITL: Approve all pending tool calls
+  const approveAllTools = useCallback(() => {
+    if (!threadId || pendingInterrupts.length === 0) return
+    log('Chat', `Approving ${pendingInterrupts.length} tool(s)`)
+
+    setPendingInterrupts([])
+    setStatus('streaming')
+    isStreamingRef.current = true
+
+    // Update tool parts to 'executing' state
+    for (const [id, tool] of toolCallsRef.current) {
+      if (tool.state === 'pending_approval') {
+        toolCallsRef.current.set(id, { ...tool, state: 'running' })
+      }
+    }
+    setMessages(prev => {
+      const msgs = [...prev]
+      const lastIdx = msgs.length - 1
+      if (lastIdx >= 0 && msgs[lastIdx].role === 'assistant') {
+        msgs[lastIdx] = {
+          ...msgs[lastIdx],
+          toolParts: Array.from(toolCallsRef.current.values()),
+        }
+      }
+      return msgs
+    })
+
+    // Send single approve decision — interrupt() returns this to wrapToolCall
+    electron.ipcRenderer
+      .invoke('chat:tool-approval-response', { threadId, decision: { type: 'approve' } })
+      .catch((err: Error) => {
+        log('Chat', `Approval invoke error: ${err.message}`)
+        setError(err)
+        setStatus('error')
+        isStreamingRef.current = false
+      })
+  }, [threadId, pendingInterrupts])
+
+  // HITL: Reject all pending tool calls
+  const rejectAllTools = useCallback((reason?: string) => {
+    if (!threadId || pendingInterrupts.length === 0) return
+    log('Chat', `Rejecting ${pendingInterrupts.length} tool(s)${reason ? `: ${reason}` : ''}`)
+
+    setPendingInterrupts([])
+    setStatus('streaming')
+    isStreamingRef.current = true
+
+    // Update tool parts to show they were rejected
+    for (const [id, tool] of toolCallsRef.current) {
+      if (tool.state === 'pending_approval') {
+        toolCallsRef.current.set(id, { ...tool, state: 'error', errorText: 'Rejected by user' })
+      }
+    }
+    setMessages(prev => {
+      const msgs = [...prev]
+      const lastIdx = msgs.length - 1
+      if (lastIdx >= 0 && msgs[lastIdx].role === 'assistant') {
+        msgs[lastIdx] = {
+          ...msgs[lastIdx],
+          toolParts: Array.from(toolCallsRef.current.values()),
+        }
+      }
+      return msgs
+    })
+
+    // Send single reject decision — interrupt() returns this to wrapToolCall
+    electron.ipcRenderer
+      .invoke('chat:tool-approval-response', {
+        threadId,
+        decision: { type: 'reject', reason: reason || 'User rejected this action' },
+      })
+      .catch((err: Error) => {
+        log('Chat', `Rejection invoke error: ${err.message}`)
+        setError(err)
+        setStatus('error')
+        isStreamingRef.current = false
+      })
+  }, [threadId, pendingInterrupts])
 
   const isLoading = status === 'submitted' || status === 'streaming'
 
@@ -420,5 +560,8 @@ export function useChatState(options: UseChatStateOptions = {}): UseChatStateRet
     threadId,
     setThreadId,
     isLoading,
+    approveAllTools,
+    rejectAllTools,
+    pendingInterrupts,
   }
 }
