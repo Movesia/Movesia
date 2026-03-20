@@ -53,8 +53,11 @@ public static class ComponentInspector
     }
 
     /// <summary>
-    /// Recursively walks a JObject/JArray tree and enriches any Unity object references
-    /// (objects with fileID + guid) by resolving the guid to an asset path via AssetDatabase.
+    /// Recursively walks a JObject/JArray tree and enriches any Unity object references.
+    /// Handles two formats produced by EditorJsonUtility.ToJson():
+    ///   1. {fileID, guid, type} — asset references with GUID (from meta files)
+    ///   2. {instanceID} — scene/runtime object references (resolved via EditorUtility)
+    /// Replaces opaque IDs with agent-friendly info (asset paths, GO paths, names).
     /// </summary>
     private static void EnrichObjectReferences(JToken token)
     {
@@ -64,7 +67,7 @@ public static class ComponentInspector
         {
             var obj = (JObject)token;
 
-            // Check if this object is a Unity object reference ({fileID, guid, type})
+            // Format 1: Unity asset reference ({fileID, guid, type})
             if (obj.TryGetValue("guid", out var guidToken) && obj.ContainsKey("fileID"))
             {
                 string guid = guidToken.ToString();
@@ -73,6 +76,51 @@ public static class ComponentInspector
                     string assetPath = AssetDatabase.GUIDToAssetPath(guid);
                     if (!string.IsNullOrEmpty(assetPath))
                         obj["assetPath"] = assetPath;
+                }
+            }
+            // Format 2: EditorJsonUtility serialized reference ({instanceID: N})
+            // This is the format produced for ObjectReference fields on components
+            else if (obj.Count == 1 && obj.TryGetValue("instanceID", out var idToken))
+            {
+                int instanceId = idToken.Value<int>();
+                if (instanceId == 0)
+                {
+                    // Null/unassigned reference — replace entire object with null
+                    // so the agent sees "fieldName": null instead of "fieldName": {"instanceID": 0}
+                    obj.Replace(JValue.CreateNull());
+                    return; // replaced the node, nothing to recurse into
+                }
+
+                var resolved = EditorCompat.IdToObject(instanceId);
+                if (resolved != null)
+                {
+                    // Remove the raw instanceID — agent shouldn't see it
+                    obj.Remove("instanceID");
+                    obj["name"] = resolved.name;
+
+                    string assetPath = AssetDatabase.GetAssetPath(resolved);
+                    if (!string.IsNullOrEmpty(assetPath))
+                    {
+                        // It's a project asset (InputActionAsset, Material, Texture, etc.)
+                        obj["assetPath"] = assetPath;
+                    }
+                    else if (resolved is GameObject go)
+                    {
+                        // It's a scene GameObject — give the agent a path
+                        obj["path"] = GameObjectResolver.BuildPath(go);
+                    }
+                    else if (resolved is Component comp)
+                    {
+                        // It's a component on a scene GO — give GO path + type
+                        obj["path"] = GameObjectResolver.BuildPath(comp.gameObject);
+                        obj["componentType"] = comp.GetType().Name;
+                    }
+                }
+                else
+                {
+                    // ID is non-zero but can't be resolved (destroyed object, etc.)
+                    obj.Replace(JValue.CreateNull());
+                    return;
                 }
             }
 

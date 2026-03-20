@@ -6,6 +6,7 @@ using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Linq;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 /// <summary>
@@ -30,7 +31,7 @@ public static class MaterialManager
         public string error;
 
         // Material info (always populated on success)
-        public int instanceId;
+        [JsonIgnore] public int instanceId;     // internal only; agent uses assetPath
         public string name;
         public string assetPath;
         public string shaderName;

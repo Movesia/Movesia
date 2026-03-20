@@ -6,6 +6,7 @@ using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Linq;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 /// <summary>
@@ -37,7 +38,7 @@ public static class PrefabManager
     {
         public bool success;
         public string error;
-        public int instanceId;
+        [JsonIgnore] public int instanceId;     // internal only; agent uses assetPath
         public string name;
         public string assetPath;
     }
@@ -85,7 +86,7 @@ public static class PrefabManager
         public string error;
 
         // Prefab / GameObject info (always populated on success)
-        public int instanceId;
+        [JsonIgnore] public int instanceId;     // internal only; agent uses assetPath
         public string name;
         public string assetPath;
 
@@ -131,6 +132,7 @@ public static class PrefabManager
         // --- Identify target ---
         int instanceId = 0,
         string assetPath = null,
+        string gameObjectPath = null,
         string prefabName = null,
         // --- Instantiation params ---
         int? parentInstanceId = null,
@@ -156,6 +158,15 @@ public static class PrefabManager
 
             bool hasModifyFields = !string.IsNullOrEmpty(componentType)
                                    && properties != null && properties.Count > 0;
+
+            // Resolve gameObjectPath → instanceId via hierarchy path
+            if (instanceId == 0 && !string.IsNullOrEmpty(gameObjectPath))
+            {
+                var resolved = GameObjectResolver.Resolve(gameObjectPath, 0);
+                if (resolved.gameObject == null)
+                    return Fail(resolved.error ?? $"GameObject not found at path: {gameObjectPath}");
+                instanceId = resolved.gameObject.GetInstanceID();
+            }
 
             // =============================================================
             // PHASE 1: Resolve or obtain the prefab asset
@@ -185,7 +196,37 @@ public static class PrefabManager
                 resolvedAssetPath = result.assetPath;
                 didCreate = true;
             }
-            // 1c. Has assetPath → INSTANTIATE by path (only if no modify-only intent)
+            // 1c. Has assetPath + savePath → CREATE prefab from asset, then INSTANTIATE it
+            else if (!string.IsNullOrEmpty(assetPath) && !string.IsNullOrEmpty(savePath))
+            {
+                // Instantiate the source asset temporarily to create a prefab from it
+                var instResult = InstantiatePrefab(assetPath, null, null, null, null);
+                if (!instResult.success)
+                    return Fail(instResult.error);
+
+                // Create prefab from the instantiated GO
+                var createResult = CreatePrefabFromGameObject(instResult.instanceId, savePath);
+
+                // Clean up the temporary scene instance
+                var tempGo = EditorCompat.IdToObject(instResult.instanceId) as GameObject;
+                if (tempGo != null)
+                    Undo.DestroyObjectImmediate(tempGo);
+
+                if (!createResult.success)
+                    return Fail(createResult.error);
+
+                // Instantiate the newly created prefab into the scene
+                var finalResult = InstantiatePrefab(createResult.assetPath, parentInstanceId, position, rotation, scale);
+                if (!finalResult.success)
+                    return Fail(finalResult.error);
+
+                resolvedInstanceId = finalResult.instanceId;
+                resolvedName = finalResult.name;
+                resolvedAssetPath = createResult.assetPath;
+                didCreate = true;
+                didInstantiate = true;
+            }
+            // 1d. Has assetPath → INSTANTIATE by path (only if no modify-only intent)
             else if (!string.IsNullOrEmpty(assetPath) && !hasModifyFields)
             {
                 var result = InstantiatePrefab(assetPath, parentInstanceId, position, rotation, scale);
@@ -197,13 +238,13 @@ public static class PrefabManager
                 resolvedAssetPath = result.assetPath;
                 didInstantiate = true;
             }
-            // 1d. Has assetPath + modify fields → modify-only (resolve path, skip instantiation)
+            // 1e. Has assetPath + modify fields → modify-only (resolve path, skip instantiation)
             else if (!string.IsNullOrEmpty(assetPath) && hasModifyFields)
             {
                 // Just resolve the path — Phase 2 will do the work
                 resolvedAssetPath = assetPath;
             }
-            // 1e. Has instanceId alone → APPLY overrides
+            // 1f. Has instanceId alone → APPLY overrides
             else if (instanceId != 0)
             {
                 var result = ApplyPrefabInstance(instanceId);
@@ -397,6 +438,9 @@ public static class PrefabManager
     {
         try
         {
+            if (!assetPath.StartsWith("Assets"))
+                assetPath = "Assets/" + assetPath.TrimStart('/');
+
             // Load the prefab asset
             var prefabAsset = AssetDatabase.LoadAssetAtPath<GameObject>(assetPath);
             if (prefabAsset == null)
@@ -862,6 +906,9 @@ public static class PrefabManager
     {
         try
         {
+            if (!assetPath.StartsWith("Assets"))
+                assetPath = "Assets/" + assetPath.TrimStart('/');
+
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(assetPath);
             if (prefab == null)
             {

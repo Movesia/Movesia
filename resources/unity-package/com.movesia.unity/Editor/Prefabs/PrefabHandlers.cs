@@ -22,8 +22,13 @@ internal static class PrefabHandlers
         // assetPath (prefab asset path for instantiate/modify)
         { "assetpath",              "assetPath" },
         { "prefabpath",             "assetPath" },
-        { "path",                   "assetPath" },
         { "prefabassetpath",        "assetPath" },
+
+        // gameObjectPath (hierarchy path for scene GOs — e.g., /SceneName/Player)
+        { "gameobjectpath",         "gameObjectPath" },
+        { "path",                   "gameObjectPath" },
+        { "gopath",                 "gameObjectPath" },
+        { "hierarchypath",          "gameObjectPath" },
 
         // prefabName (search-based instantiate)
         { "prefabname",             "prefabName" },
@@ -83,6 +88,7 @@ internal static class PrefabHandlers
 
         int instanceId = b?["instanceId"]?.ToObject<int>() ?? 0;
         string assetPath = b?["assetPath"]?.ToString();
+        string gameObjectPath = b?["gameObjectPath"]?.ToString();
         string prefabName = b?["prefabName"]?.ToString();
 
         // Instantiation params
@@ -112,6 +118,7 @@ internal static class PrefabHandlers
         var result = PrefabManager.ManagePrefab(
             instanceId: instanceId,
             assetPath: assetPath,
+            gameObjectPath: gameObjectPath,
             prefabName: prefabName,
             parentInstanceId: parentInstanceId,
             position: position,
