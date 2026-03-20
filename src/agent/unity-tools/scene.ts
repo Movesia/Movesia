@@ -16,7 +16,7 @@ export const SceneSchema = z.object({
         .describe('The scene operation.'),
 
     path: z.string().optional()
-        .describe('File path (Assets/Scenes/MyScene.unity).'),
+        .describe('File path (/Scenes/MyScene.unity).'),
 
     additive: z.boolean().default(false)
         .describe('Open/Create additively (keep current scene loaded)?')
@@ -43,7 +43,7 @@ async function unitySceneImpl(input: SceneInput, _config?: any): Promise<string>
                 return JSON.stringify({
                     error: "path is required for 'open'",
                     hint: "Provide the scene file path (relative to Assets folder)",
-                    example: "unity_scene({ action: 'open', path: 'Assets/Scenes/Level2.unity' })"
+                    example: "unity_scene({ action: 'open', path: '/Scenes/Level2.unity' })"
                 }, null, 2);
             }
             result = await callUnityAsync('open_scene', { path, additive });
@@ -62,7 +62,7 @@ async function unitySceneImpl(input: SceneInput, _config?: any): Promise<string>
                 return JSON.stringify({
                     error: "path is required for 'create'",
                     hint: "Provide the path for the new scene file (must end with .unity)",
-                    example: "unity_scene({ action: 'create', path: 'Assets/Scenes/NewLevel.unity' })"
+                    example: "unity_scene({ action: 'create', path: '/Scenes/NewLevel.unity' })"
                 }, null, 2);
             }
             result = await callUnityAsync('create_scene', { savePath: path, additive });
@@ -73,7 +73,7 @@ async function unitySceneImpl(input: SceneInput, _config?: any): Promise<string>
                 return JSON.stringify({
                     error: "path is required for 'set_active'",
                     hint: "The scene must already be loaded (use additive: true when opening)",
-                    example: "unity_scene({ action: 'set_active', path: 'Assets/Scenes/Level2.unity' })"
+                    example: "unity_scene({ action: 'set_active', path: '/Scenes/Level2.unity' })"
                 }, null, 2);
             }
             result = await callUnityAsync('set_active_scene', { path });

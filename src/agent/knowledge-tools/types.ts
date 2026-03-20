@@ -27,8 +27,10 @@ export interface QdrantConfig {
   apiKey: string
   /** Available collections with metadata */
   collections: CollectionMeta[]
-  /** OpenRouter API key for embedding queries */
+  /** OAuth access token for embedding requests (used as fallback if getAccessToken is not set) */
   openRouterApiKey: string
+  /** Async getter for a fresh access token — called per-request so expired tokens trigger on-demand refresh */
+  getAccessToken?: () => Promise<string | null>
   /** Embedding model identifier (default: "openai/text-embedding-3-small") */
   embeddingModel?: string
   /** Minimum similarity score (default: 0.7) */

@@ -25,7 +25,7 @@ export const PrefabSchema = z.object({
 
     // --- INSTANTIATE BY PATH / MODIFY ASSET ---
     asset_path: z.string().optional()
-        .describe("Path to .prefab file (e.g., 'Assets/Prefabs/Player.prefab')."),
+        .describe("Path to .prefab or model file (.fbx, .obj, .gltf). Works with any importable asset."),
 
     // --- CREATE ASSET / APPLY OVERRIDES ---
     path: z.string().optional()
@@ -33,15 +33,15 @@ export const PrefabSchema = z.object({
 
     // --- CREATE ASSET ---
     save_path: z.string().optional()
-        .describe("Where to save new prefab (e.g., 'Assets/Prefabs/NewPrefab.prefab'). Used with path."),
+        .describe("Where to save new prefab (e.g., '/Prefabs/NewPrefab.prefab'). Used with path."),
 
     // --- INSTANTIATE OPTIONS ---
-    position: z.tuple([z.number(), z.number(), z.number()]).optional()
-        .describe('Spawn position [x, y, z].'),
-    rotation: z.tuple([z.number(), z.number(), z.number()]).optional()
-        .describe('Spawn rotation [x, y, z] in euler angles.'),
-    scale: z.tuple([z.number(), z.number(), z.number()]).optional()
-        .describe('Spawn scale [x, y, z].'),
+    position: z.object({ x: z.number(), y: z.number(), z: z.number() }).optional()
+        .describe('Spawn position {x, y, z}.'),
+    rotation: z.object({ x: z.number(), y: z.number(), z: z.number() }).optional()
+        .describe('Spawn rotation {x, y, z} in euler angles.'),
+    scale: z.object({ x: z.number(), y: z.number(), z: z.number() }).optional()
+        .describe('Spawn scale {x, y, z}.'),
     parent_path: z.string().optional()
         .describe('Parent GameObject path to spawn under (e.g. "/SampleScene/Environment").'),
 
@@ -76,6 +76,9 @@ async function unityPrefabImpl(input: PrefabInput, _config?: any): Promise<strin
         properties
     } = input;
 
+    // Convert {x,y,z} objects to [x,y,z] arrays for Unity's C# side (expects float[])
+    const vec3ToArray = (v: { x?: number; y?: number; z?: number }) => [v.x ?? 0, v.y ?? 0, v.z ?? 0];
+
     // Build the unified prefab message body
     const body: Record<string, unknown> = {};
 
@@ -101,13 +104,13 @@ async function unityPrefabImpl(input: PrefabInput, _config?: any): Promise<strin
 
     // Instantiate options
     if (position !== undefined) {
-        body.position = position;
+        body.position = vec3ToArray(position);
     }
     if (rotation !== undefined) {
-        body.rotation = rotation;
+        body.rotation = vec3ToArray(rotation);
     }
     if (scale !== undefined) {
-        body.scale = scale;
+        body.scale = vec3ToArray(scale);
     }
     if (parentPath !== undefined) {
         body.parentPath = parentPath;
@@ -131,8 +134,8 @@ async function unityPrefabImpl(input: PrefabInput, _config?: any): Promise<strin
             hint: "See examples below for each operation",
             examples: {
                 instantiate: 'unity_prefab({ prefab_name: "Enemy", position: [0, 1, 0] })',
-                modify: 'unity_prefab({ asset_path: "Assets/Prefabs/Enemy.prefab", component_type: "Rigidbody", properties: { m_Mass: 5.0 } })',
-                create_and_modify: 'unity_prefab({ path: "/SampleScene/Player", save_path: "Assets/Prefabs/Player.prefab", component_type: "Rigidbody", properties: { m_Mass: 5.0 } })',
+                modify: 'unity_prefab({ asset_path: "/Prefabs/Enemy.prefab", component_type: "Rigidbody", properties: { m_Mass: 5.0 } })',
+                create_and_modify: 'unity_prefab({ path: "/SampleScene/Player", save_path: "/Prefabs/Player.prefab", component_type: "Rigidbody", properties: { m_Mass: 5.0 } })',
                 apply: 'unity_prefab({ path: "/SampleScene/Player" })'
             }
         }, null, 2);
@@ -156,7 +159,8 @@ Supports COMPOUND operations — combine any Phase 1 + Phase 2 in one call:
 
 PHASE 1 (pick one):
 - prefab_name → instantiate by name
-- asset_path (alone) → instantiate by path
+- asset_path (alone) → instantiate by path (prefabs, .fbx, .obj, .gltf — any model)
+- asset_path + save_path → create prefab from model file (auto: instantiate → save prefab → cleanup → spawn prefab)
 - path + save_path → create prefab from scene GameObject
 - path (alone) → apply overrides
 
@@ -165,9 +169,10 @@ PHASE 2 (optional, chains after Phase 1):
 
 EXAMPLES:
 Instantiate: unity_prefab({ prefab_name: 'Enemy', position: [0, 1, 0] })
-Modify only: unity_prefab({ asset_path: 'Assets/Prefabs/Enemy.prefab', component_type: 'Rigidbody', properties: { m_Mass: 5.0 } })
-Create + modify: unity_prefab({ path: "/SampleScene/Player", save_path: 'Assets/Prefabs/Player.prefab', component_type: 'Rigidbody', properties: { m_Mass: 5.0 } })
-Instantiate + modify: unity_prefab({ prefab_name: 'Enemy', position: [0,1,0], component_type: 'BoxCollider', properties: { m_Size: [2,3,1] } })
+Instantiate FBX: unity_prefab({ asset_path: '/Models/Door.fbx', position: [0, 0, 0] })
+FBX → Prefab: unity_prefab({ asset_path: '/Models/Door.fbx', save_path: '/Prefabs/Door.prefab', position: [0, 0, 0] })
+Modify only: unity_prefab({ asset_path: '/Prefabs/Enemy.prefab', component_type: 'Rigidbody', properties: { m_Mass: 5.0 } })
+Create from scene: unity_prefab({ path: "/SampleScene/Player", save_path: '/Prefabs/Player.prefab' })
 
 Response flags: instantiated, created, modified, applied (multiple can be true)
 Optional spawn fields: position, rotation, scale, parent_path

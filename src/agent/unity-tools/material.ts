@@ -52,7 +52,7 @@ export const MaterialSchema = z.object({
 
   // Identify existing material (omit both for CREATE)
   instance_id: z.number().int().optional().describe('Instance ID of existing material to modify/assign.'),
-  asset_path: z.string().optional().describe("Asset path of existing material (e.g., 'Assets/Materials/Foo.mat')."),
+  asset_path: z.string().optional().describe("Asset path of existing material (e.g., '/Materials/Foo.mat')."),
 
   // Create params (only used when creating new)
   shader_name: z
@@ -60,7 +60,7 @@ export const MaterialSchema = z.object({
     .optional()
     .describe("Full shader name (e.g., 'Universal Render Pipeline/Lit'). Auto-detects URP/Standard if omitted."),
   name: z.string().optional().describe("Material name (default: 'NewMaterial')."),
-  save_path: z.string().optional().describe("Where to save new material (default: 'Assets/Materials/{name}.mat')."),
+  save_path: z.string().optional().describe("Where to save new material (default: '/Materials/{name}.mat')."),
 
   // Modify params (applied whether creating or loading)
   properties: PropertiesSchema,
@@ -143,9 +143,9 @@ async function unityMaterialImpl (input: MaterialInput, _config?: any): Promise<
         return JSON.stringify(
           {
             error: "For 'modify', provide instance_id OR asset_path to identify the material",
-            hint: "Provide the material asset_path (e.g., 'Assets/Materials/Red.mat')",
+            hint: "Provide the material asset_path (e.g., '/Materials/Red.mat')",
             example:
-              "unity_material({ action: 'modify', asset_path: 'Assets/Materials/BrickWall.mat', properties: { mainTexture: 'Assets/Textures/Brick_Albedo.png' } })",
+              "unity_material({ action: 'modify', asset_path: '/Materials/BrickWall.mat', properties: { mainTexture: '/Textures/Brick_Albedo.png' } })",
           },
           null,
           2
@@ -156,7 +156,7 @@ async function unityMaterialImpl (input: MaterialInput, _config?: any): Promise<
           {
             error: "For 'modify', provide properties or keywords to change",
             example:
-              "unity_material({ action: 'modify', asset_path: 'Assets/Materials/BrickWall.mat', properties: { metallic: 0.9 } })",
+              "unity_material({ action: 'modify', asset_path: '/Materials/BrickWall.mat', properties: { metallic: 0.9 } })",
           },
           null,
           2
@@ -171,7 +171,7 @@ async function unityMaterialImpl (input: MaterialInput, _config?: any): Promise<
           {
             error: "For 'assign', provide instance_id OR asset_path to identify the material",
             example:
-              "unity_material({ action: 'assign', asset_path: 'Assets/Materials/BrickWall.mat', assign_to: { game_object_path: '/SampleScene/Wall' } })",
+              "unity_material({ action: 'assign', asset_path: '/Materials/BrickWall.mat', assign_to: { game_object_path: '/SampleScene/Wall' } })",
           },
           null,
           2
@@ -182,7 +182,7 @@ async function unityMaterialImpl (input: MaterialInput, _config?: any): Promise<
           {
             error: "For 'assign', provide assign_to with the target GameObject",
             example:
-              "unity_material({ action: 'assign', asset_path: 'Assets/Materials/BrickWall.mat', assign_to: { game_object_path: '/SampleScene/Wall', slot_index: 0 } })",
+              "unity_material({ action: 'assign', asset_path: '/Materials/BrickWall.mat', assign_to: { game_object_path: '/SampleScene/Wall', slot_index: 0 } })",
           },
           null,
           2
@@ -197,7 +197,7 @@ async function unityMaterialImpl (input: MaterialInput, _config?: any): Promise<
           {
             error: "For 'create_and_assign', provide assign_to with the target GameObject",
             example:
-              "unity_material({ action: 'create_and_assign', name: 'MetalFloor', properties: { mainTexture: 'Assets/Textures/Metal_Albedo.png' }, assign_to: { game_object_path: '/SampleScene/Floor' } })",
+              "unity_material({ action: 'create_and_assign', name: 'MetalFloor', properties: { mainTexture: '/Textures/Metal_Albedo.png' }, assign_to: { game_object_path: '/SampleScene/Floor' } })",
           },
           null,
           2
@@ -239,9 +239,9 @@ mainTexture/baseMap: texture asset path | normalMap: texture asset path | metall
 KEYWORDS: { "_EMISSION": true } or ["_EMISSION"] (all enabled)
 
 EXAMPLES:
-unity_material({ action: 'create', name: 'BrickWall', properties: { mainTexture: 'Assets/Textures/Brick_Albedo.png', normalMap: 'Assets/Textures/Brick_Normal.png', metallic: 0.1, smoothness: 0.6 } })
-unity_material({ action: 'assign', asset_path: 'Assets/Materials/BrickWall.mat', assign_to: { game_object_path: "/SampleScene/Wall" } })
-unity_material({ action: 'create_and_assign', name: 'MetalFloor', properties: { mainTexture: 'Assets/Textures/Metal_Albedo.png', metallicMap: 'Assets/Textures/Metal_Metallic.png', normalMap: 'Assets/Textures/Metal_Normal.png', smoothness: 0.8 }, assign_to: { game_object_path: "/SampleScene/Floor", slot_index: 0 } })`,
+unity_material({ action: 'create', name: 'BrickWall', properties: { mainTexture: '/Textures/Brick_Albedo.png', normalMap: '/Textures/Brick_Normal.png', metallic: 0.1, smoothness: 0.6 } })
+unity_material({ action: 'assign', asset_path: '/Materials/BrickWall.mat', assign_to: { game_object_path: "/SampleScene/Wall" } })
+unity_material({ action: 'create_and_assign', name: 'MetalFloor', properties: { mainTexture: '/Textures/Metal_Albedo.png', metallicMap: '/Textures/Metal_Metallic.png', normalMap: '/Textures/Metal_Normal.png', smoothness: 0.8 }, assign_to: { game_object_path: "/SampleScene/Floor", slot_index: 0 } })`,
   schema: MaterialSchema,
   func: unityMaterialImpl,
 });

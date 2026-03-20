@@ -99,10 +99,15 @@ export async function embedQuery(text: string): Promise<number[]> {
   const model = _config.embeddingModel ?? 'openai/text-embedding-3-small'
   const proxyBaseUrl = process.env.MOVESIA_AUTH_URL || 'https://movesia.com'
 
+  // Get a fresh token per-request so expired tokens trigger on-demand refresh
+  const token = _config.getAccessToken
+    ? (await _config.getAccessToken() ?? _config.openRouterApiKey)
+    : _config.openRouterApiKey
+
   const response = await fetch(`${proxyBaseUrl}/api/v1/embeddings`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${_config.openRouterApiKey}`, // OAuth access token (not API key)
+      'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({

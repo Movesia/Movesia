@@ -72,9 +72,8 @@ export const ComponentSchema = z.object({
     .record(z.string(), z.unknown())
     .optional()
     .describe(
-      'Map of SerializedProperty paths to values. Applied in a single batch. ' +
-        'Vectors use arrays: { m_LocalPosition: [0, 5, 0] }. Colors: { m_Color: [1, 0, 0, 1] }. ' +
-        'If omitted with component_type, the component is only added (no modification).'
+      'Property name → value map. Vectors: [0,5,0]. Colors: [1,0,0,1]. ' +
+        'Object references: { assetPath: "/Scene/Path" } or { assetPath: "/Prefabs/..." }.'
     ),
 });
 
@@ -210,10 +209,9 @@ WORKFLOW: Just provide path + component_type + properties. Adds the component if
 Use component_instance_id from previous responses for follow-up modifications without re-resolving.
 
 PROPERTY FORMAT:
-- Vectors as arrays: { m_LocalPosition: [0, 5, 0] }
-- Colors as RGBA: { m_Color: [1.0, 0.0, 0.0, 1.0] }
-- Enums as int or string: { m_Type: 1 } or { m_Type: "Directional" }
-- NOT objects: { m_LocalPosition: { x: 0 } } ← WRONG`,
+- Vectors: [0, 5, 0], Colors: [1, 0, 0, 1], Enums: int or string
+- Object references: { assetPath: "/Scene/Object" } or { assetPath: "/Prefabs/Prefab.prefab" }
+  Use this to assign references instead of Find() in scripts.`,
   schema: ComponentSchema,
   func: unityComponentImpl,
 });

@@ -49,7 +49,7 @@ export const QuerySchema = z.object({
     label: z.string().optional()
         .describe("Unity asset label filter. For 'search_assets'."),
     folder: z.string().optional()
-        .describe("Scope to folder (e.g. 'Assets/Textures'). For 'search_assets'."),
+        .describe("Scope to folder (e.g. '/Textures'). For 'search_assets'."),
     extension: z.string().optional()
         .describe("File extension filter (e.g. '.png'). For 'search_assets'."),
     limit: z.number().int().optional()

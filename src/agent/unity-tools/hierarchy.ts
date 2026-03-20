@@ -29,12 +29,12 @@ export const HierarchySchema = z.object({
     // Positioning
     parent_path: z.string().optional()
         .describe('Parent GameObject path for create/reparent (e.g. "/SampleScene/Environment").'),
-    position: z.tuple([z.number(), z.number(), z.number()]).optional()
-        .describe('[x, y, z] for creation.'),
-    rotation: z.tuple([z.number(), z.number(), z.number()]).optional()
-        .describe('[x, y, z] euler angles for creation.'),
-    scale: z.tuple([z.number(), z.number(), z.number()]).optional()
-        .describe('[x, y, z] scale for creation.'),
+    position: z.object({ x: z.number(), y: z.number(), z: z.number() }).optional()
+        .describe('Position {x, y, z} for creation.'),
+    rotation: z.object({ x: z.number(), y: z.number(), z: z.number() }).optional()
+        .describe('Euler angles {x, y, z} for creation.'),
+    scale: z.object({ x: z.number(), y: z.number(), z: z.number() }).optional()
+        .describe('Scale {x, y, z} for creation.'),
     target_scene: z.string().optional()
         .describe("Scene name for 'move_scene'.")
 });
@@ -68,6 +68,9 @@ async function unityHierarchyImpl(input: HierarchyInput, _config?: any): Promise
         target_scene
     } = input;
 
+    // Convert {x,y,z} objects to [x,y,z] arrays for Unity's C# side (expects float[])
+    const vec3ToArray = (v: { x?: number; y?: number; z?: number }) => [v.x ?? 0, v.y ?? 0, v.z ?? 0];
+
     const params: Record<string, unknown> = {};
 
     switch (action) {
@@ -75,9 +78,9 @@ async function unityHierarchyImpl(input: HierarchyInput, _config?: any): Promise
             if (name) params.name = name;
             if (primitive_type) params.primitive = primitive_type;
             if (parent_path) params.parentPath = parent_path;
-            if (position) params.position = position;
-            if (rotation) params.rotation = rotation;
-            if (scale) params.scale = scale;
+            if (position) params.position = vec3ToArray(position);
+            if (rotation) params.rotation = vec3ToArray(rotation);
+            if (scale) params.scale = vec3ToArray(scale);
             break;
 
         case 'duplicate':

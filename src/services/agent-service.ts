@@ -57,7 +57,7 @@ const QDRANT_API_KEY = process.env.QDRANT_API_KEY ?? ''
  *
  * @param accessToken - OAuth access token for embedding API calls
  */
-function buildQdrantConfig(accessToken: string): QdrantConfig | undefined {
+function buildQdrantConfig(accessToken: string, authService?: AuthService): QdrantConfig | undefined {
   if (!QDRANT_URL || !QDRANT_API_KEY) {
     return undefined
   }
@@ -66,6 +66,8 @@ function buildQdrantConfig(accessToken: string): QdrantConfig | undefined {
     url: QDRANT_URL,
     apiKey: QDRANT_API_KEY,
     openRouterApiKey: accessToken,
+    // Per-request token getter — triggers on-demand refresh if expired
+    getAccessToken: authService ? () => authService.getAccessToken() : undefined,
     embeddingModel: 'openai/text-embedding-3-small',
     scoreThreshold: 0.35,
     timeout: 10_000,
@@ -81,6 +83,12 @@ function buildQdrantConfig(accessToken: string): QdrantConfig | undefined {
         description: 'In-depth ebooks: architecture, patterns, performance, DOTS',
         contentField: 'content',
         defaultLimit: 2,
+      },
+      {
+        name: 'unity-workflows',
+        description: 'Step-by-step task recipes with exact tool call sequences',
+        contentField: 'content',
+        defaultLimit: 1,
       },
     ],
   }
@@ -357,7 +365,7 @@ export class AgentService {
         openRouterApiKey: accessToken,
         tavilyApiKey: TAVILY_API_KEY || undefined,
         projectPath: this.config.projectPath,
-        qdrantConfig: buildQdrantConfig(accessToken),
+        qdrantConfig: buildQdrantConfig(accessToken, this.authService),
       })
     }
 
@@ -380,7 +388,7 @@ export class AgentService {
           openRouterApiKey: newToken,
           tavilyApiKey: TAVILY_API_KEY || undefined,
           projectPath: this.config.projectPath,
-          qdrantConfig: buildQdrantConfig(newToken),
+          qdrantConfig: buildQdrantConfig(newToken, this.authService),
         })
         logger.info('Agent recreated with refreshed token')
       })
@@ -765,7 +773,7 @@ export class AgentService {
       openRouterApiKey: accessToken,
       tavilyApiKey: TAVILY_API_KEY || undefined,
       projectPath: newPath,
-      qdrantConfig: buildQdrantConfig(accessToken),
+      qdrantConfig: buildQdrantConfig(accessToken, this.authService),
     })
     logger.info('Agent recreated with filesystem middleware')
 

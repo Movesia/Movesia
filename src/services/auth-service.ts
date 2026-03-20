@@ -56,6 +56,12 @@ const REFRESH_BUFFER_SECONDS = 5 * 60
 /** How long to wait for the callback before timing out (5 minutes) */
 const CALLBACK_TIMEOUT_MS = 5 * 60 * 1000
 
+/** Max retries for proactive token refresh before giving up */
+const REFRESH_MAX_RETRIES = 5
+
+/** Base delay between refresh retries (doubles each attempt) */
+const REFRESH_RETRY_BASE_MS = 30_000 // 30 seconds
+
 /** Token file path — encrypted with safeStorage, stored in userData */
 const TOKEN_FILE = join(app.getPath('userData'), '.movesia-tokens')
 
@@ -545,24 +551,48 @@ export class AuthService {
     const delayMs = refreshAt - Date.now()
 
     if (delayMs <= 0) {
-      // Already needs refresh
-      this.refreshAccessToken().catch((err) =>
-        log.warn(`Scheduled refresh failed: ${(err as Error).message}`)
-      )
+      // Already needs refresh — attempt with retries then reschedule
+      this.refreshWithRetry().then(() => {
+        this.scheduleTokenRefresh()
+      }).catch((err) => {
+        log.error(`Scheduled refresh exhausted all retries: ${(err as Error).message}`)
+      })
       return
     }
 
     log.info(`Token refresh scheduled in ${Math.round(delayMs / 60000)} min`)
     this.refreshTimer = setTimeout(async () => {
       try {
-        await this.refreshAccessToken()
+        await this.refreshWithRetry()
         log.info('Proactive token refresh succeeded')
-        // Reschedule for next refresh cycle
         this.scheduleTokenRefresh()
       } catch (err) {
-        log.warn(`Proactive refresh failed: ${(err as Error).message}`)
+        log.error(`Proactive refresh exhausted all retries: ${(err as Error).message}`)
       }
     }, delayMs)
+  }
+
+  /**
+   * Attempt to refresh the access token with exponential backoff retries.
+   * Retries up to REFRESH_MAX_RETRIES times with doubling delays
+   * (30s, 60s, 120s, 240s, 480s) so transient outages don't kill
+   * the refresh cycle permanently.
+   */
+  private async refreshWithRetry(): Promise<void> {
+    for (let attempt = 0; attempt < REFRESH_MAX_RETRIES; attempt++) {
+      try {
+        await this.refreshAccessToken()
+        return
+      } catch (err) {
+        const delayMs = REFRESH_RETRY_BASE_MS * Math.pow(2, attempt)
+        log.warn(
+          `Token refresh attempt ${attempt + 1}/${REFRESH_MAX_RETRIES} failed: ${(err as Error).message}. ` +
+          `Retrying in ${Math.round(delayMs / 1000)}s...`
+        )
+        await new Promise(resolve => setTimeout(resolve, delayMs))
+      }
+    }
+    throw new Error(`Token refresh failed after ${REFRESH_MAX_RETRIES} attempts`)
   }
 
   private cancelRefreshTimer(): void {

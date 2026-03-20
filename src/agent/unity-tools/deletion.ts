@@ -21,7 +21,7 @@ import { getUnityManager } from './connection';
  */
 export const DeletionSchema = z.object({
     paths: z.array(z.string()).min(1)
-        .describe('Array of asset paths to delete (e.g., ["Assets/Scripts/Old.cs", "Assets/Materials/Unused.mat"]). Paths should start with "Assets/" or be relative to it.'),
+        .describe('Array of asset paths to delete (e.g., ["/Scripts/Old.cs", "/Materials/Unused.mat"]).'),
 });
 
 /** Type inferred from the Zod schema */
@@ -180,7 +180,7 @@ export const unityDeletion = new DynamicStructuredTool({
     name: 'unity_deletion',
     description: `Delete assets from the Unity project by moving them to the OS trash (recycle bin). Deletion is recoverable.
 
-Accepts an array of asset paths. Paths should start with "Assets/" (e.g., "Assets/Scripts/OldScript.cs"). If omitted, "Assets/" is auto-prepended.
+Accepts an array of asset paths (e.g., "/Scripts/OldScript.cs").
 
 Use unity_query(action='search_assets') first to find asset paths before deleting.
 
