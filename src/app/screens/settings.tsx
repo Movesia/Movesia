@@ -545,15 +545,6 @@ function AboutSection () {
   )
 }
 
-function AboutRow ({ label, value }: { label: string; value: string }) {
-  return (
-    <div className='flex items-center justify-between'>
-      <span className='text-[13px] text-muted-foreground'>{label}</span>
-      <span className='text-[13px] font-mono text-foreground'>{value}</span>
-    </div>
-  )
-}
-
 function AboutLink ({ label, href, last }: { label: string; href: string; last?: boolean }) {
   return (
     <button

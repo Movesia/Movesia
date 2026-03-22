@@ -85,29 +85,28 @@ export const UNITY_PROJECT_PATH_RESOLVED = _unityProjectPath ? resolve(_unityPro
 // =============================================================================
 
 /**
- * Create the ChatOpenAI model.
+ * Create the ChatOpenAI model routed through the Movesia proxy.
  *
- * Currently configured to hit Fireworks AI directly for testing.
- * To revert to the Movesia proxy, restore the proxy baseURL and use
- * the OAuth access token as apiKey.
+ * Sends model="default" — the proxy injects the real model name from its
+ * AI_MODEL env var before forwarding to the configured provider (Fireworks,
+ * OpenRouter, etc.). This means model/provider changes are server-side only.
  *
- * @param accessToken - OAuth access token (unused when hitting Fireworks directly)
- * @param modelName - Model identifier (default: accounts/fireworks/models/deepseek-v3)
+ * @param accessToken - OAuth access token (proxy validates this)
+ * @param modelName - Optional model override (default: "default" — proxy decides)
  */
 export function createModel (accessToken: string, modelName?: string) {
-  const fireworksApiKey = process.env.FIREWORKS_API_KEY || '';
-  const defaultModel = process.env.MOVESIA_MODEL || 'accounts/fireworks/models/minimax-m2p5';
-  const resolvedModel = modelName ?? defaultModel;
+  const authServerUrl = process.env.MOVESIA_AUTH_URL || 'https://movesia.com';
+  const resolvedModel = modelName ?? 'default';
 
-  log.info(`Creating model via Fireworks AI: ${resolvedModel} ` + `(key: ${fireworksApiKey.slice(0, 8)}...)`);
+  log.info(`Creating model via Movesia proxy: ${authServerUrl}/api/v1 (model: ${resolvedModel})`);
 
   return new ChatOpenAI({
     modelName: resolvedModel,
     streaming: true,
     configuration: {
-      baseURL: 'https://api.fireworks.ai/inference/v1',
+      baseURL: `${authServerUrl}/api/v1`,
     },
-    apiKey: fireworksApiKey,
+    apiKey: accessToken,
   });
 }
 
