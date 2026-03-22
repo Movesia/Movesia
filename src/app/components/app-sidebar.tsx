@@ -9,6 +9,7 @@ import {
   User,
   ArrowLeftRight,
   Bug,
+  ArrowUpCircle,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -61,6 +62,7 @@ interface AppSidebarProps {
   onSignOut?: () => void
   onSwitchProject?: () => void
   onDebug?: () => void
+  onUpgradePlan?: () => void
 }
 
 // =============================================================================
@@ -256,6 +258,7 @@ export function AppSidebar ({
   onSignOut,
   onSwitchProject,
   onDebug,
+  onUpgradePlan,
 }: AppSidebarProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const { state: sidebarState, isMobile } = useSidebar()
@@ -418,6 +421,13 @@ export function AppSidebar ({
                       UI Debugger
                     </DropdownMenuItem>
                   )}
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  <DropdownMenuItem onClick={onUpgradePlan} className='cursor-pointer'>
+                    <ArrowUpCircle />
+                    Upgrade Plan
+                  </DropdownMenuItem>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={onSignOut} className='cursor-pointer'>

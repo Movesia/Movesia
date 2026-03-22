@@ -146,6 +146,10 @@ function AppShell () {
     navigate('/debug');
   }, [navigate]);
 
+  const handleUpgradePlan = useCallback(() => {
+    electron.ipcRenderer.invoke('open-url', 'https://movesia.com/pricing');
+  }, []);
+
   const handleSignOut = useCallback(async () => {
     try {
       await signOut();
@@ -179,6 +183,7 @@ function AppShell () {
           onSwitchProject={handleSwitchProject}
           onSignOut={handleSignOut}
           onDebug={__DEV__ ? handleDebug : undefined}
+          onUpgradePlan={handleUpgradePlan}
         />
         <SidebarInset>
           <Routes>

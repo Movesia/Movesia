@@ -2,26 +2,30 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
-  Settings2,
-  Palette,
-  Bot,
   Unplug,
-  Keyboard,
+  CreditCard,
+  Bot,
+  Palette,
+  Shield,
   Info,
   Sun,
   Moon,
   Monitor,
   ExternalLink,
-  FolderOpen,
-  RotateCcw,
+  RefreshCw,
+  CheckCircle2,
+  XCircle,
+  Loader2,
 } from 'lucide-react'
 import { useTheme } from '@/app/components/theme-provider'
+import { useUnityStatus } from '@/app/hooks/useUnityStatus'
+import { useAuthState } from '@/app/hooks/useAuthState'
 import { Switch } from '@/app/components/ui/switch'
 import { Label } from '@/app/components/ui/label'
 import { Separator } from '@/app/components/ui/separator'
 import { Button } from '@/app/components/ui/button'
-import { Input } from '@/app/components/ui/input'
-import { Slider } from '@/app/components/ui/slider'
+import { Badge } from '@/app/components/ui/badge'
+import { Avatar, AvatarFallback, AvatarImage } from '@/app/components/ui/avatar'
 import {
   Select,
   SelectContent,
@@ -35,29 +39,15 @@ import { cn } from '@/app/lib/utils'
 // Types & Constants
 // =============================================================================
 
-type Section = 'general' | 'appearance' | 'model' | 'unity' | 'shortcuts' | 'about'
+type Section = 'connection' | 'account' | 'agent' | 'theme' | 'privacy' | 'about'
 
 const NAV_ITEMS: { id: Section; label: string; icon: React.ElementType }[] = [
-  { id: 'general', label: 'General', icon: Settings2 },
-  { id: 'appearance', label: 'Appearance', icon: Palette },
-  { id: 'model', label: 'AI Model', icon: Bot },
-  { id: 'unity', label: 'Unity', icon: Unplug },
-  { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
+  { id: 'connection', label: 'Connection', icon: Unplug },
+  { id: 'account', label: 'Account', icon: CreditCard },
+  { id: 'agent', label: 'Agent', icon: Bot },
+  { id: 'theme', label: 'Theme', icon: Palette },
+  { id: 'privacy', label: 'Data & Privacy', icon: Shield },
   { id: 'about', label: 'About', icon: Info },
-]
-
-const SHORTCUTS = [
-  { action: 'New chat', keys: 'Ctrl+N' },
-  { action: 'Toggle sidebar', keys: 'Ctrl+B' },
-  { action: 'Settings', keys: 'Ctrl+,' },
-  { action: 'Send message', keys: 'Enter' },
-  { action: 'New line in message', keys: 'Shift+Enter' },
-  { action: 'Toggle theme', keys: 'Ctrl+Shift+T' },
-  { action: 'Zoom in', keys: 'Ctrl+=' },
-  { action: 'Zoom out', keys: 'Ctrl+-' },
-  { action: 'Reset zoom', keys: 'Ctrl+0' },
-  { action: 'Toggle fullscreen', keys: 'F11' },
-  { action: 'Developer tools', keys: 'Ctrl+Shift+I' },
 ]
 
 // =============================================================================
@@ -89,157 +79,286 @@ function SettingRow ({
 }
 
 // =============================================================================
-// Section: General
+// Section: Connection Status
 // =============================================================================
 
-function GeneralSection ({
-  settings,
-  onChange,
-}: {
-  settings: SettingsState
-  onChange: <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => void
-}) {
+function ConnectionSection () {
+  const { connectionState, projectName } = useUnityStatus()
+  const [isReconnecting, setIsReconnecting] = useState(false)
+
+  const handleReconnect = async () => {
+    setIsReconnecting(true)
+    try {
+      // Re-trigger the current project connection
+      const status = await electron.ipcRenderer.invoke('unity:status')
+      if (status?.projectPath) {
+        await electron.ipcRenderer.invoke('unity:set-project', status.projectPath)
+      }
+    } catch {
+      // ignore — will show updated status on next poll
+    } finally {
+      setTimeout(() => setIsReconnecting(false), 2000)
+    }
+  }
+
   return (
     <div>
-      <SectionHeader title='General' description='App behavior and startup preferences.' />
+      <SectionHeader title='Connection' description='Unity Editor connection status.' />
 
-      <SettingRow label='Launch at startup' description='Automatically open Movesia when you log in.'>
-        <Switch
-          checked={settings.launchAtStartup}
-          onCheckedChange={(v) => onChange('launchAtStartup', v)}
-        />
-      </SettingRow>
+      <div className='rounded-lg border border-border p-5'>
+        <div className='flex items-start gap-4'>
+          {/* Status indicator */}
+          <div className={cn(
+            'mt-0.5 size-3 rounded-full shrink-0',
+            connectionState === 'connected' && 'bg-green-500',
+            connectionState === 'compiling' && 'bg-yellow-500 animate-pulse',
+            connectionState === 'disconnected' && 'bg-red-500',
+            connectionState === 'error' && 'bg-red-500',
+          )} />
 
-      <Separator />
+          <div className='flex-1 min-w-0'>
+            {connectionState === 'connected' && (
+              <>
+                <div className='flex items-center gap-2'>
+                  <CheckCircle2 className='size-4 text-green-500' />
+                  <span className='text-sm font-medium text-foreground'>Connected to Unity</span>
+                </div>
+                {projectName && (
+                  <p className='mt-1 text-xs text-muted-foreground'>
+                    Project: <span className='font-medium text-foreground'>{projectName}</span>
+                  </p>
+                )}
+              </>
+            )}
 
-      <SettingRow label='Show in system tray' description='Keep Movesia running in the background when you close the window.'>
-        <Switch
-          checked={settings.showInTray}
-          onCheckedChange={(v) => onChange('showInTray', v)}
-        />
-      </SettingRow>
+            {connectionState === 'compiling' && (
+              <>
+                <div className='flex items-center gap-2'>
+                  <Loader2 className='size-4 text-yellow-500 animate-spin' />
+                  <span className='text-sm font-medium text-foreground'>Unity is compiling...</span>
+                </div>
+                <p className='mt-1 text-xs text-muted-foreground'>
+                  Waiting for script compilation to finish.
+                </p>
+              </>
+            )}
 
-      <Separator />
+            {(connectionState === 'disconnected' || connectionState === 'error') && (
+              <>
+                <div className='flex items-center gap-2'>
+                  <XCircle className='size-4 text-red-500' />
+                  <span className='text-sm font-medium text-foreground'>Not connected</span>
+                </div>
+                <p className='mt-2 text-xs text-muted-foreground leading-relaxed'>
+                  Can't reach Unity — make sure the Movesia plugin is installed and Unity is open.
+                </p>
+              </>
+            )}
+          </div>
+        </div>
 
-      <SettingRow label='Check for updates' description='Automatically check for new versions on startup.'>
-        <Switch
-          checked={settings.autoUpdate}
-          onCheckedChange={(v) => onChange('autoUpdate', v)}
-        />
-      </SettingRow>
-
-      <Separator />
-
-      <SettingRow label='Default project path' description='Default directory when scanning for Unity projects.'>
-        <div className='flex items-center gap-2'>
-          <Input
-            value={settings.defaultProjectPath}
-            onChange={(e) => onChange('defaultProjectPath', e.target.value)}
-            placeholder='C:\Users\...\Projects'
-            className='w-56 h-8 text-xs font-mono'
-          />
-          <Button variant='outline' size='icon-sm' className='shrink-0'>
-            <FolderOpen className='size-3.5' />
+        {/* Actions */}
+        <div className='flex items-center gap-3 mt-4 pt-4 border-t border-border'>
+          <Button
+            variant='outline'
+            size='sm'
+            onClick={handleReconnect}
+            disabled={isReconnecting || connectionState === 'connected'}
+          >
+            <RefreshCw className={cn('size-3.5', isReconnecting && 'animate-spin')} />
+            {isReconnecting ? 'Reconnecting...' : 'Reconnect'}
+          </Button>
+          <Button
+            variant='ghost'
+            size='sm'
+            onClick={() => electron.ipcRenderer.invoke('open-url', 'https://docs.movesia.com/troubleshooting')}
+          >
+            Troubleshooting
+            <ExternalLink className='size-3' />
           </Button>
         </div>
-      </SettingRow>
-
-      <Separator />
-
-      <div className='py-4'>
-        <Label className='text-[13px] font-medium text-foreground'>Clear data</Label>
-        <p className='mt-0.5 text-xs text-muted-foreground leading-relaxed'>
-          Remove all conversation history and cached data. This cannot be undone.
-        </p>
-        <Button variant='outline' size='sm' className='mt-3 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30'>
-          <RotateCcw className='size-3.5' />
-          Clear all data
-        </Button>
       </div>
     </div>
   )
 }
 
 // =============================================================================
-// Section: Appearance
+// Section: Account & Credits
 // =============================================================================
 
-function AppearanceSection ({
+function AccountSection () {
+  const { user } = useAuthState()
+
+  const userInitials = (user?.name ?? '?')
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
+
+  // TODO: wire to real usage data via IPC
+  const creditsUsed = 142
+  const creditsTotal = 400
+  const usagePercent = Math.round((creditsUsed / creditsTotal) * 100)
+
+  return (
+    <div>
+      <SectionHeader title='Account' description='Your plan and usage.' />
+
+      {/* User info card */}
+      <div className='rounded-lg border border-border p-5'>
+        <div className='flex items-center gap-3'>
+          <Avatar>
+            {user?.picture && <AvatarImage src={user.picture} alt={user.name ?? ''} />}
+            <AvatarFallback>{userInitials}</AvatarFallback>
+          </Avatar>
+          <div className='flex-1 min-w-0'>
+            <p className='text-sm font-medium text-foreground truncate'>{user?.name ?? 'Unknown'}</p>
+            <p className='text-xs text-muted-foreground truncate'>{user?.email ?? ''}</p>
+          </div>
+          <Badge variant='secondary'>Free</Badge>
+        </div>
+
+        <Separator className='my-4' />
+
+        {/* Credits usage */}
+        <div>
+          <div className='flex items-center justify-between mb-2'>
+            <span className='text-xs font-medium text-foreground'>Operations this month</span>
+            <span className='text-xs font-mono text-muted-foreground tabular-nums'>
+              {creditsUsed} / {creditsTotal}
+            </span>
+          </div>
+          <div className='h-2 rounded-full bg-muted overflow-hidden'>
+            <div
+              className={cn(
+                'h-full rounded-full transition-all duration-500',
+                usagePercent < 75 ? 'bg-primary' : usagePercent < 90 ? 'bg-yellow-500' : 'bg-red-500',
+              )}
+              style={{ width: `${usagePercent}%` }}
+            />
+          </div>
+          <p className='mt-1.5 text-[11px] text-muted-foreground'>
+            {creditsTotal - creditsUsed} operations remaining. Resets monthly.
+          </p>
+        </div>
+
+        <Separator className='my-4' />
+
+        {/* Actions */}
+        <div className='flex items-center gap-3'>
+          <Button
+            variant='default'
+            size='sm'
+            onClick={() => electron.ipcRenderer.invoke('open-url', 'https://movesia.com/pricing')}
+          >
+            Upgrade Plan
+          </Button>
+          <Button
+            variant='outline'
+            size='sm'
+            onClick={() => electron.ipcRenderer.invoke('open-url', 'https://movesia.com/billing')}
+          >
+            Manage Subscription
+            <ExternalLink className='size-3' />
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// =============================================================================
+// Section: Agent Behavior
+// =============================================================================
+
+function AgentSection ({
   settings,
   onChange,
 }: {
   settings: SettingsState
   onChange: <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => void
 }) {
-  const { theme, setTheme } = useTheme()
-
   return (
     <div>
-      <SectionHeader title='Appearance' description='Customize the look and feel of the app.' />
+      <SectionHeader title='Agent Behavior' description='Control how the AI assistant works with your project.' />
 
-      {/* Theme selector — visual cards */}
-      <div className='py-4'>
-        <Label className='text-[13px] font-medium text-foreground'>Theme</Label>
-        <p className='mt-0.5 text-xs text-muted-foreground leading-relaxed'>
-          Choose how Movesia looks to you.
-        </p>
-        <div className='flex gap-3 mt-3'>
-          <ThemeCard
-            label='Light'
-            icon={Sun}
-            active={theme === 'light'}
-            onClick={() => setTheme('light')}
-            preview='light'
-          />
-          <ThemeCard
-            label='Dark'
-            icon={Moon}
-            active={theme === 'dark'}
-            onClick={() => setTheme('dark')}
-            preview='dark'
-          />
-          <ThemeCard
-            label='System'
-            icon={Monitor}
-            active={theme === 'system'}
-            onClick={() => setTheme('system')}
-            preview='system'
-          />
-        </div>
-      </div>
+      <SettingRow
+        label='Confirm before changes'
+        description='The agent will ask for your approval before modifying your scene or assets.'
+      >
+        <Switch
+          checked={settings.confirmBeforeChanges}
+          onCheckedChange={(v) => onChange('confirmBeforeChanges', v)}
+        />
+      </SettingRow>
 
       <Separator />
 
-      <SettingRow label='Font size' description='Adjust the base font size for the interface.'>
-        <Select value={settings.fontSize} onValueChange={(v) => onChange('fontSize', v)}>
+      <SettingRow
+        label='Response detail level'
+        description='Concise gives you speed, detailed gives you explanations.'
+      >
+        <Select value={settings.responseDetail} onValueChange={(v) => onChange('responseDetail', v)}>
           <SelectTrigger size='sm' className='w-28'>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value='small'>Small</SelectItem>
-            <SelectItem value='medium'>Medium</SelectItem>
-            <SelectItem value='large'>Large</SelectItem>
+            <SelectItem value='concise'>Concise</SelectItem>
+            <SelectItem value='detailed'>Detailed</SelectItem>
           </SelectContent>
         </Select>
       </SettingRow>
 
       <Separator />
 
-      <SettingRow label='Compact mode' description='Use denser spacing throughout the interface.'>
+      <SettingRow
+        label='Search assets first'
+        description='The agent will look through your existing project assets before creating new ones.'
+      >
         <Switch
-          checked={settings.compactMode}
-          onCheckedChange={(v) => onChange('compactMode', v)}
+          checked={settings.searchAssetsFirst}
+          onCheckedChange={(v) => onChange('searchAssetsFirst', v)}
         />
       </SettingRow>
+    </div>
+  )
+}
 
-      <Separator />
+// =============================================================================
+// Section: Theme
+// =============================================================================
 
-      <SettingRow label='Show timestamps' description='Display timestamps on chat messages.'>
-        <Switch
-          checked={settings.showTimestamps}
-          onCheckedChange={(v) => onChange('showTimestamps', v)}
+function ThemeSection () {
+  const { theme, setTheme } = useTheme()
+
+  return (
+    <div>
+      <SectionHeader title='Theme' description='Choose how Movesia looks to you.' />
+
+      <div className='flex gap-3'>
+        <ThemeCard
+          label='Light'
+          icon={Sun}
+          active={theme === 'light'}
+          onClick={() => setTheme('light')}
+          preview='light'
         />
-      </SettingRow>
+        <ThemeCard
+          label='Dark'
+          icon={Moon}
+          active={theme === 'dark'}
+          onClick={() => setTheme('dark')}
+          preview='dark'
+        />
+        <ThemeCard
+          label='System'
+          icon={Monitor}
+          active={theme === 'system'}
+          onClick={() => setTheme('system')}
+          preview='system'
+        />
+      </div>
     </div>
   )
 }
@@ -299,10 +418,10 @@ function ThemeCard ({
 }
 
 // =============================================================================
-// Section: AI Model
+// Section: Data & Privacy
 // =============================================================================
 
-function ModelSection ({
+function PrivacySection ({
   settings,
   onChange,
 }: {
@@ -311,208 +430,115 @@ function ModelSection ({
 }) {
   return (
     <div>
-      <SectionHeader title='AI Model' description='Configure the language model used by the agent.' />
+      <SectionHeader title='Data & Privacy' description='How your data is handled.' />
 
-      <SettingRow label='API key' description='Your OpenRouter API key for model access.'>
-        <Input
-          type='password'
-          value={settings.apiKey}
-          onChange={(e) => onChange('apiKey', e.target.value)}
-          placeholder='sk-or-...'
-          className='w-56 h-8 text-xs font-mono'
+      {/* Trust statement */}
+      <div className='rounded-lg border border-border p-4 bg-accent/30 mb-4'>
+        <div className='flex items-start gap-3'>
+          <Shield className='size-4 mt-0.5 text-primary shrink-0' />
+          <div className='text-xs text-muted-foreground leading-relaxed space-y-2'>
+            <p>
+              When you chat with the agent, Movesia sends your prompts and relevant scene context
+              (hierarchy, component data, asset names) to the AI model to generate responses.
+            </p>
+            <p className='font-medium text-foreground'>
+              Your project source code is never stored on our servers.
+            </p>
+            <p>
+              Conversations are processed in real time and not retained after the session ends.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <SettingRow
+        label='Store conversation history locally'
+        description='Save your chat history on this device so you can revisit past sessions.'
+      >
+        <Switch
+          checked={settings.storeHistory}
+          onCheckedChange={(v) => onChange('storeHistory', v)}
         />
       </SettingRow>
 
       <Separator />
 
-      <SettingRow label='Model' description='The language model powering the assistant.'>
-        <Select value={settings.model} onValueChange={(v) => onChange('model', v)}>
-          <SelectTrigger size='sm' className='w-52'>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value='anthropic/claude-haiku-4.5'>Claude Haiku 4.5</SelectItem>
-            <SelectItem value='anthropic/claude-sonnet-4'>Claude Sonnet 4</SelectItem>
-            <SelectItem value='anthropic/claude-opus-4'>Claude Opus 4</SelectItem>
-            <SelectItem value='anthropic/claude-sonnet-4.5'>Claude Sonnet 4.5</SelectItem>
-          </SelectContent>
-        </Select>
+      <SettingRow
+        label='Send anonymous usage analytics'
+        description='Help us improve Movesia by sharing anonymous usage data. No project content is ever included.'
+      >
+        <Switch
+          checked={settings.sendAnalytics}
+          onCheckedChange={(v) => onChange('sendAnalytics', v)}
+        />
       </SettingRow>
 
       <Separator />
 
       <div className='py-4'>
-        <div className='flex items-center justify-between gap-8'>
-          <div className='min-w-0 flex-1'>
-            <Label className='text-[13px] font-medium text-foreground'>Temperature</Label>
-            <p className='mt-0.5 text-xs text-muted-foreground leading-relaxed'>
-              Controls randomness. Lower values are more focused, higher values more creative.
-            </p>
-          </div>
-          <span className='text-xs font-mono text-muted-foreground tabular-nums w-8 text-right'>
-            {settings.temperature.toFixed(1)}
-          </span>
-        </div>
-        <Slider
-          value={[settings.temperature]}
-          onValueChange={([v]) => onChange('temperature', v)}
-          min={0}
-          max={1}
-          step={0.1}
-          className='mt-3 w-full max-w-sm'
-        />
-      </div>
-
-      <Separator />
-
-      <SettingRow label='Max tokens' description='Maximum length of the model response.'>
-        <Select value={settings.maxTokens} onValueChange={(v) => onChange('maxTokens', v)}>
-          <SelectTrigger size='sm' className='w-32'>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value='1024'>1,024</SelectItem>
-            <SelectItem value='2048'>2,048</SelectItem>
-            <SelectItem value='4096'>4,096</SelectItem>
-            <SelectItem value='8192'>8,192</SelectItem>
-            <SelectItem value='16384'>16,384</SelectItem>
-          </SelectContent>
-        </Select>
-      </SettingRow>
-
-      <Separator />
-
-      <SettingRow label='Stream responses' description='Show tokens as they are generated instead of waiting for the full response.'>
-        <Switch
-          checked={settings.streamResponses}
-          onCheckedChange={(v) => onChange('streamResponses', v)}
-        />
-      </SettingRow>
-    </div>
-  )
-}
-
-// =============================================================================
-// Section: Unity
-// =============================================================================
-
-function UnitySection ({
-  settings,
-  onChange,
-}: {
-  settings: SettingsState
-  onChange: <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => void
-}) {
-  return (
-    <div>
-      <SectionHeader title='Unity Connection' description='Manage the WebSocket connection to the Unity Editor.' />
-
-      <SettingRow label='WebSocket port' description='The local port used to communicate with the Unity Editor.'>
-        <Input
-          type='number'
-          value={settings.wsPort}
-          onChange={(e) => onChange('wsPort', e.target.value)}
-          className='w-24 h-8 text-xs font-mono text-center'
-        />
-      </SettingRow>
-
-      <Separator />
-
-      <SettingRow label='Auto-connect' description='Automatically connect to Unity when the app starts.'>
-        <Switch
-          checked={settings.autoConnect}
-          onCheckedChange={(v) => onChange('autoConnect', v)}
-        />
-      </SettingRow>
-
-      <Separator />
-
-      <SettingRow label='Connection timeout' description='How long to wait before giving up on a connection attempt.'>
-        <Select value={settings.connectionTimeout} onValueChange={(v) => onChange('connectionTimeout', v)}>
-          <SelectTrigger size='sm' className='w-28'>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value='5'>5 seconds</SelectItem>
-            <SelectItem value='10'>10 seconds</SelectItem>
-            <SelectItem value='30'>30 seconds</SelectItem>
-            <SelectItem value='60'>60 seconds</SelectItem>
-          </SelectContent>
-        </Select>
-      </SettingRow>
-
-      <Separator />
-
-      <SettingRow label='Auto-install package' description='Prompt to install the Movesia Unity package when opening a project without it.'>
-        <Switch
-          checked={settings.autoInstallPackage}
-          onCheckedChange={(v) => onChange('autoInstallPackage', v)}
-        />
-      </SettingRow>
-    </div>
-  )
-}
-
-// =============================================================================
-// Section: Shortcuts
-// =============================================================================
-
-function ShortcutsSection () {
-  return (
-    <div>
-      <SectionHeader title='Keyboard Shortcuts' description='Quick reference for keyboard shortcuts.' />
-
-      <div className='rounded-lg border border-border overflow-hidden mt-1'>
-        {SHORTCUTS.map((shortcut, i) => (
-          <div
-            key={shortcut.action}
-            className={cn(
-              'flex items-center justify-between px-4 py-2.5',
-              i !== SHORTCUTS.length - 1 && 'border-b border-border',
-            )}
-          >
-            <span className='text-[13px] text-foreground'>{shortcut.action}</span>
-            <kbd className='px-2 py-0.5 rounded bg-muted text-[11px] font-mono text-muted-foreground border border-border'>
-              {shortcut.keys}
-            </kbd>
-          </div>
-        ))}
+        <Button
+          variant='ghost'
+          size='sm'
+          onClick={() => electron.ipcRenderer.invoke('open-url', 'https://movesia.com/privacy')}
+        >
+          Read our full Privacy Policy
+          <ExternalLink className='size-3' />
+        </Button>
       </div>
     </div>
   )
 }
 
 // =============================================================================
-// Section: About
+// Section: About & Updates
 // =============================================================================
 
 function AboutSection () {
+  const [checkingUpdate, setCheckingUpdate] = useState(false)
+
+  const handleCheckUpdate = () => {
+    setCheckingUpdate(true)
+    // TODO: wire to real update check IPC
+    setTimeout(() => setCheckingUpdate(false), 3000)
+  }
+
   return (
     <div>
       <SectionHeader title='About Movesia' description='Version information and resources.' />
 
-      <div className='space-y-4 mt-1'>
+      <div className='space-y-4'>
         {/* Version info */}
         <div className='rounded-lg border border-border p-4 space-y-3'>
-          <AboutRow label='App version' value={__APP_VERSION__ ?? '0.1.0'} />
-          <Separator />
-          <AboutRow label='Electron' value={String(electron?.versions?.electron ?? 'N/A')} />
-          <Separator />
-          <AboutRow label='Chromium' value={String(electron?.versions?.chrome ?? 'N/A')} />
-          <Separator />
-          <AboutRow label='Node.js' value={String(electron?.versions?.node ?? 'N/A')} />
+          <div className='flex items-center justify-between'>
+            <span className='text-[13px] text-muted-foreground'>Version</span>
+            <div className='flex items-center gap-2'>
+              <span className='text-[13px] font-mono text-foreground'>{__APP_VERSION__ ?? '0.1.0'}</span>
+              <Badge variant='secondary' className='text-[10px] px-1.5 py-0 font-semibold uppercase tracking-wider'>Beta</Badge>
+            </div>
+          </div>
         </div>
+
+        {/* Update check */}
+        <Button variant='outline' size='sm' onClick={handleCheckUpdate} disabled={checkingUpdate}>
+          {checkingUpdate ? (
+            <>
+              <Loader2 className='size-3.5 animate-spin' />
+              Checking for updates...
+            </>
+          ) : (
+            'Check for Updates'
+          )}
+        </Button>
 
         {/* Links */}
         <div className='rounded-lg border border-border overflow-hidden'>
-          <AboutLink label='Website' href='https://movesia.dev' />
-          <AboutLink label='Documentation' href='https://docs.movesia.dev' />
-          <AboutLink label='Changelog' href='https://movesia.dev/changelog' />
-          <AboutLink label='Report an issue' href='https://github.com/movesia/movesia/issues' last />
+          <AboutLink label='Documentation' href='https://docs.movesia.com' />
+          <AboutLink label='Changelog' href='https://movesia.com/changelog' />
+          <AboutLink label='Support' href='https://movesia.com/support' last />
         </div>
 
         <p className='text-xs text-muted-foreground/60 pt-2'>
-          Made for Unity developers.
+          Made for Game developers.
         </p>
       </div>
     </div>
@@ -531,7 +557,7 @@ function AboutRow ({ label, value }: { label: string; value: string }) {
 function AboutLink ({ label, href, last }: { label: string; href: string; last?: boolean }) {
   return (
     <button
-      onClick={() => window.open(href, '_blank')}
+      onClick={() => electron.ipcRenderer.invoke('open-url', href)}
       className={cn(
         'flex w-full items-center justify-between px-4 py-2.5 text-[13px] text-foreground hover:bg-accent/50 transition-colors cursor-pointer',
         !last && 'border-b border-border',
@@ -561,45 +587,21 @@ function SectionHeader ({ title, description }: { title: string; description: st
 // =============================================================================
 
 interface SettingsState {
-  // General
-  launchAtStartup: boolean
-  showInTray: boolean
-  autoUpdate: boolean
-  defaultProjectPath: string
-  // Appearance
-  fontSize: string
-  compactMode: boolean
-  showTimestamps: boolean
-  // Model
-  apiKey: string
-  model: string
-  temperature: number
-  maxTokens: string
-  streamResponses: boolean
-  // Unity
-  wsPort: string
-  autoConnect: boolean
-  connectionTimeout: string
-  autoInstallPackage: boolean
+  // Agent behavior
+  confirmBeforeChanges: boolean
+  responseDetail: string
+  searchAssetsFirst: boolean
+  // Privacy
+  storeHistory: boolean
+  sendAnalytics: boolean
 }
 
 const DEFAULT_SETTINGS: SettingsState = {
-  launchAtStartup: false,
-  showInTray: true,
-  autoUpdate: true,
-  defaultProjectPath: '',
-  fontSize: 'medium',
-  compactMode: false,
-  showTimestamps: false,
-  apiKey: '',
-  model: 'anthropic/claude-haiku-4.5',
-  temperature: 0.3,
-  maxTokens: '4096',
-  streamResponses: true,
-  wsPort: '8765',
-  autoConnect: true,
-  connectionTimeout: '10',
-  autoInstallPackage: true,
+  confirmBeforeChanges: true,
+  responseDetail: 'concise',
+  searchAssetsFirst: true,
+  storeHistory: true,
+  sendAnalytics: true,
 }
 
 // =============================================================================
@@ -608,7 +610,7 @@ const DEFAULT_SETTINGS: SettingsState = {
 
 export function SettingsScreen () {
   const navigate = useNavigate()
-  const [activeSection, setActiveSection] = useState<Section>('general')
+  const [activeSection, setActiveSection] = useState<Section>('connection')
   const [settings, setSettings] = useState<SettingsState>(DEFAULT_SETTINGS)
 
   const handleChange = <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => {
@@ -619,19 +621,19 @@ export function SettingsScreen () {
   return (
     <div className='flex h-full min-h-0'>
       {/* ── Left navigation ── */}
-      <nav className='w-52 shrink-0 border-r border-border flex flex-col'>
-        <div className='p-3'>
+      <nav className='w-56 shrink-0 flex flex-col'>
+        <div className='px-5 pt-5 pb-6'>
           <button
             onClick={() => navigate('/chat')}
-            className='flex items-center gap-2 text-sm font-semibold text-foreground hover:text-primary transition-colors cursor-pointer px-2 py-1.5 -ml-1 rounded-md hover:bg-accent/50'
+            className='flex items-center gap-2 text-lg font-semibold text-foreground hover:text-primary transition-colors cursor-pointer'
           >
             <ArrowLeft className='size-4' />
             Settings
           </button>
         </div>
 
-        <div className='flex-1 px-3 pb-3'>
-          <div className='flex flex-col gap-0.5'>
+        <div className='flex-1 px-4 pb-4'>
+          <div className='flex flex-col gap-1'>
             {NAV_ITEMS.map((item) => {
               const Icon = item.icon
               const isActive = activeSection === item.id
@@ -640,13 +642,13 @@ export function SettingsScreen () {
                   key={item.id}
                   onClick={() => setActiveSection(item.id)}
                   className={cn(
-                    'flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] font-medium transition-colors cursor-pointer text-left',
+                    'flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors cursor-pointer text-left',
                     isActive
                       ? 'bg-accent text-accent-foreground'
                       : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',
                   )}
                 >
-                  <Icon className='size-4 shrink-0' />
+                  <Icon className='size-[18px] shrink-0' />
                   {item.label}
                 </button>
               )
@@ -658,19 +660,15 @@ export function SettingsScreen () {
       {/* ── Right content area ── */}
       <main className='flex-1 overflow-y-auto'>
         <div className='max-w-xl mx-auto px-8 py-6'>
-          {activeSection === 'general' && (
-            <GeneralSection settings={settings} onChange={handleChange} />
+          {activeSection === 'connection' && <ConnectionSection />}
+          {activeSection === 'account' && <AccountSection />}
+          {activeSection === 'agent' && (
+            <AgentSection settings={settings} onChange={handleChange} />
           )}
-          {activeSection === 'appearance' && (
-            <AppearanceSection settings={settings} onChange={handleChange} />
+          {activeSection === 'theme' && <ThemeSection />}
+          {activeSection === 'privacy' && (
+            <PrivacySection settings={settings} onChange={handleChange} />
           )}
-          {activeSection === 'model' && (
-            <ModelSection settings={settings} onChange={handleChange} />
-          )}
-          {activeSection === 'unity' && (
-            <UnitySection settings={settings} onChange={handleChange} />
-          )}
-          {activeSection === 'shortcuts' && <ShortcutsSection />}
           {activeSection === 'about' && <AboutSection />}
         </div>
       </main>
