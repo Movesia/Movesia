@@ -1,4 +1,4 @@
-import { Globe, Trash2, Palette, ListTodo } from 'lucide-react'
+import { Globe, Trash2, Palette, ListTodo, File, FilePen } from 'lucide-react'
 import type { ToolConfig, ToolRegistration, ToolUIComponent } from './types'
 
 // =============================================================================
@@ -71,6 +71,20 @@ const defaultConfigs: Record<string, ToolConfig> = {
     color: 'text-amber-400',
     category: 'system',
     description: 'Manage task list',
+  },
+  write_file: {
+    displayName: 'Write File',
+    icon: File,
+    color: 'text-emerald-400',
+    category: 'mutation',
+    description: 'Create or overwrite a file',
+  },
+  edit_file: {
+    displayName: 'Edit File',
+    icon: FilePen,
+    color: 'text-blue-400',
+    category: 'mutation',
+    description: 'Edit an existing file',
   },
 }
 

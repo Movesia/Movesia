@@ -8,6 +8,7 @@ import {
   LogOut,
   User,
   ArrowLeftRight,
+  Bug,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -59,6 +60,7 @@ interface AppSidebarProps {
   onProfile?: () => void
   onSignOut?: () => void
   onSwitchProject?: () => void
+  onDebug?: () => void
 }
 
 // =============================================================================
@@ -253,6 +255,7 @@ export function AppSidebar ({
   onProfile,
   onSignOut,
   onSwitchProject,
+  onDebug,
 }: AppSidebarProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const { state: sidebarState, isMobile } = useSidebar()
@@ -409,6 +412,12 @@ export function AppSidebar ({
                     <Settings />
                     Settings
                   </DropdownMenuItem>
+                  {__DEV__ && onDebug && (
+                    <DropdownMenuItem onClick={onDebug} className='cursor-pointer'>
+                      <Bug />
+                      UI Debugger
+                    </DropdownMenuItem>
+                  )}
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={onSignOut} className='cursor-pointer'>

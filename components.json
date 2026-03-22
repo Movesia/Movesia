@@ -10,6 +10,7 @@
     "cssVariables": true,
     "prefix": ""
   },
+  "iconLibrary": "lucide",
   "aliases": {
     "components": "@/app/components",
     "utils": "@/app/lib/utils",
@@ -17,5 +18,7 @@
     "lib": "@/app/lib",
     "hooks": "@/app/hooks"
   },
-  "iconLibrary": "lucide"
+  "registries": {
+    "@tool-ui": "https://www.tool-ui.com/r/{name}.json"
+  }
 }

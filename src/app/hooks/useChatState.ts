@@ -182,13 +182,35 @@ export function useChatState(options: UseChatStateOptions = {}): UseChatStateRet
         case 'tool-input-start': {
           const toolCallId = agentEvent.toolCallId as string
           const toolName = agentEvent.toolName as string
-          // Create a new ToolPart in "running" state, recording current text offset
-          toolCallsRef.current.set(toolCallId, {
-            type: toolName,
-            state: 'running',
-            toolCallId,
-            textOffsetStart: accumulatedTextRef.current.length,
-          })
+
+          // After HITL approval, LangGraph re-emits on_tool_start with a NEW run_id
+          // for the same logical tool. Check if we already have a 'running' tool with
+          // the same name (set back to 'running' by approveAllTools). If so, reuse
+          // that entry to avoid duplicates — just update its toolCallId.
+          let reusedExistingId: string | null = null
+          for (const [existingId, existing] of toolCallsRef.current) {
+            if (existing.type === toolName && existing.state === 'running' && existingId !== toolCallId) {
+              // Reuse: remove old key, re-insert under new toolCallId
+              toolCallsRef.current.delete(existingId)
+              toolCallsRef.current.set(toolCallId, {
+                ...existing,
+                toolCallId,
+              })
+              reusedExistingId = existingId
+              break
+            }
+          }
+
+          if (!reusedExistingId) {
+            // No existing running tool to reuse — create a fresh entry
+            toolCallsRef.current.set(toolCallId, {
+              type: toolName,
+              state: 'running',
+              toolCallId,
+              textOffsetStart: accumulatedTextRef.current.length,
+            })
+          }
+
           // Push to message immediately so UI shows spinner
           setMessages(prev => {
             const msgs = [...prev]

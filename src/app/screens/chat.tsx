@@ -22,62 +22,12 @@ import { Loader } from '@/app/components/prompt-kit/loader'
 import { ScrollButton } from '@/app/components/prompt-kit/scroll-button'
 import { FeedbackBar } from '@/app/components/prompt-kit/feedback-bar'
 import { PromptSuggestion } from '@/app/components/prompt-kit/prompt-suggestion'
-import { Tool } from '@/app/components/prompt-kit/tool'
 import type { ToolPart } from '@/app/components/prompt-kit/tool'
+import { ToolStep } from '@/app/components/tools/ToolStep'
+import { ToolGroupStep } from '@/app/components/tools/ToolGroupStep'
+import { ToolApprovalPanel } from '@/app/components/tools/ToolApprovalPanel'
+import { buildSegments, groupConsecutiveTools } from '@/app/lib/segments'
 import type { ChatMessage, ChatStatus } from '@/app/hooks/useChatState'
-
-// =============================================================================
-// Interleaved segment types — text and tools in order
-// =============================================================================
-
-type Segment =
-  | { kind: 'text'; content: string }
-  | { kind: 'tool'; toolPart: ToolPart }
-
-/**
- * Build interleaved segments from message content + toolParts.
- * Each toolPart has a textOffsetStart indicating where in the text it was invoked.
- * We split the text at those offsets and interleave tool cards between text chunks.
- */
-function buildSegments(content: string, toolParts?: ToolPart[]): Segment[] {
-  if (!toolParts || toolParts.length === 0) {
-    return content ? [{ kind: 'text', content }] : []
-  }
-
-  // Sort tools by their text offset (earliest first)
-  const sorted = [...toolParts].sort(
-    (a, b) => (a.textOffsetStart ?? 0) - (b.textOffsetStart ?? 0)
-  )
-
-  const segments: Segment[] = []
-  let cursor = 0
-
-  for (const tool of sorted) {
-    const offset = tool.textOffsetStart ?? 0
-
-    // Add text before this tool (if any)
-    if (offset > cursor && offset <= content.length) {
-      const textChunk = content.slice(cursor, offset)
-      if (textChunk.trim()) {
-        segments.push({ kind: 'text', content: textChunk })
-      }
-      cursor = offset
-    }
-
-    // Add the tool
-    segments.push({ kind: 'tool', toolPart: tool })
-  }
-
-  // Add remaining text after the last tool
-  if (cursor < content.length) {
-    const remaining = content.slice(cursor)
-    if (remaining.trim()) {
-      segments.push({ kind: 'text', content: remaining })
-    }
-  }
-
-  return segments
-}
 
 // =============================================================================
 // Suggestions
@@ -109,38 +59,31 @@ const AssistantMessage = memo(function AssistantMessage({
   isLastAssistant,
   feedbackGiven,
   onFeedback,
-  onApprove,
-  onReject,
 }: {
   message: ChatMessage
   isStreaming: boolean
   isLastAssistant: boolean
   feedbackGiven: boolean
   onFeedback: () => void
-  onApprove?: () => void
-  onReject?: () => void
 }) {
   // Defer content so markdown parsing is low-priority during streaming
   const deferredContent = useDeferredValue(message.content)
   // Use deferred value only while streaming; once done, use actual content immediately
   const content = isStreaming ? deferredContent : message.content
-  const segments = buildSegments(content, message.toolParts)
-
-  const hasPendingApproval = message.toolParts?.some(t => t.state === 'pending_approval')
+  const segments = groupConsecutiveTools(buildSegments(content, message.toolParts))
 
   return (
     <div className='py-1'>
       {segments.map((seg, i) =>
         seg.kind === 'text' ? (
           <Markdown key={`text-${i}`} id={`${message.id}-${i}`}>{seg.content}</Markdown>
+        ) : seg.kind === 'tool-group' ? (
+          <div key={`group-${i}`} className='my-2'>
+            <ToolGroupStep toolParts={seg.toolParts} />
+          </div>
         ) : (
           <div key={seg.toolPart.toolCallId || `tool-${i}`} className='my-2'>
-            <Tool
-              toolPart={seg.toolPart}
-              defaultOpen={false}
-              onApprove={hasPendingApproval ? onApprove : undefined}
-              onReject={hasPendingApproval ? onReject : undefined}
-            />
+            <ToolStep toolPart={seg.toolPart} />
           </div>
         )
       )}
@@ -172,6 +115,22 @@ interface ChatScreenProps {
 }
 
 // =============================================================================
+// Helper: find pending tool parts from messages
+// =============================================================================
+
+function findPendingTools(messages: ChatMessage[]): ToolPart[] {
+  // Scan from last message backwards to find pending_approval tools
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]
+    if (msg.role === 'assistant' && msg.toolParts) {
+      const pending = msg.toolParts.filter(t => t.state === 'pending_approval')
+      if (pending.length > 0) return pending
+    }
+  }
+  return []
+}
+
+// =============================================================================
 // ChatScreen
 // =============================================================================
 
@@ -181,6 +140,8 @@ export function ChatScreen ({ messages, isLoading, status, error, onSendMessage,
   const [files, setFiles] = useState<File[]>([])
   const [feedbackGiven, setFeedbackGiven] = useState<Set<string>>(new Set())
   const uploadInputRef = useRef<HTMLInputElement>(null)
+
+  const pendingTools = isAwaitingApproval ? findPendingTools(messages) : []
 
   const handleSubmit = useCallback(() => {
     if ((!input.trim() && files.length === 0) || isLoading || isAwaitingApproval) return
@@ -335,9 +296,15 @@ export function ChatScreen ({ messages, isLoading, status, error, onSendMessage,
   }
 
   // Active chat — messages with input pinned to bottom
+  const showOverlay = isAwaitingApproval && pendingTools.length > 0
+
   return (
-    <div className='flex flex-col h-full bg-background text-foreground'>
+    <div className='flex flex-col h-full bg-background text-foreground relative'>
       <ChatContainerRoot className='flex-1'>
+        {/* Dim overlay on chat while awaiting approval */}
+        {showOverlay && (
+          <div className='absolute inset-0 bg-background/60 z-10 pointer-events-none' />
+        )}
         <ChatContainerContent className='px-4 py-4 max-w-[740px] mx-auto w-full space-y-4'>
           {messages.map((msg, index) => {
             const isLastAssistant =
@@ -359,8 +326,6 @@ export function ChatScreen ({ messages, isLoading, status, error, onSendMessage,
                 isLastAssistant={isLastAssistant}
                 feedbackGiven={feedbackGiven.has(msg.id)}
                 onFeedback={() => setFeedbackGiven((prev) => new Set(prev).add(msg.id))}
-                onApprove={isAwaitingApproval ? onApproveAll : undefined}
-                onReject={isAwaitingApproval ? () => onRejectAll?.() : undefined}
               />
             )
           })}
@@ -387,8 +352,18 @@ export function ChatScreen ({ messages, isLoading, status, error, onSendMessage,
         </div>
       </ChatContainerRoot>
 
-      {/* Prompt input pinned to bottom */}
-      <div className='px-4 pb-4 pt-2'>{promptInput}</div>
+      {/* Bottom area: approval panel OR prompt input */}
+      <div className='px-4 pb-4 pt-2'>
+        {isAwaitingApproval && pendingTools.length > 0 && onApproveAll && onRejectAll ? (
+          <ToolApprovalPanel
+            pendingTools={pendingTools}
+            onApprove={onApproveAll}
+            onReject={onRejectAll}
+          />
+        ) : (
+          promptInput
+        )}
+      </div>
     </div>
   )
 }

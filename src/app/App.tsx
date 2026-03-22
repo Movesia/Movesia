@@ -11,6 +11,7 @@ import { ChatScreen } from '@/app/screens/chat';
 import { SettingsScreen } from '@/app/screens/settings';
 import { SetupScreen } from '@/app/screens/setup';
 import { SignInScreen } from '@/app/screens/signIn';
+import { UIDebuggerScreen } from '@/app/screens/ui-debugger';
 import { MenuChannels } from '@/channels/menuChannels';
 import { useThreads } from '@/app/hooks/useThreads';
 import { useChatState } from '@/app/hooks/useChatState';
@@ -141,6 +142,10 @@ function AppShell () {
     navigate('/setup');
   }, [navigate]);
 
+  const handleDebug = useCallback(() => {
+    navigate('/debug');
+  }, [navigate]);
+
   const handleSignOut = useCallback(async () => {
     try {
       await signOut();
@@ -173,6 +178,7 @@ function AppShell () {
           onSettings={handleSettings}
           onSwitchProject={handleSwitchProject}
           onSignOut={handleSignOut}
+          onDebug={__DEV__ ? handleDebug : undefined}
         />
         <SidebarInset>
           <Routes>
@@ -194,6 +200,7 @@ function AppShell () {
               }
             />
             <Route path='/settings' Component={SettingsScreen} />
+            {__DEV__ && <Route path='/debug' Component={UIDebuggerScreen} />}
           </Routes>
         </SidebarInset>
       </div>

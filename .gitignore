@@ -91,3 +91,6 @@ typings/
 
 # Electron-Forge
 out/
+
+# UI Debugger (dev-only screen, not shipped)
+src/app/screens/ui-debugger.tsx
