@@ -20,6 +20,7 @@ import {
 import { useTheme } from '@/app/components/theme-provider'
 import { useUnityStatus } from '@/app/hooks/useUnityStatus'
 import { useAuthState } from '@/app/hooks/useAuthState'
+import { useSubscription } from '@/app/hooks/useSubscription'
 import { Switch } from '@/app/components/ui/switch'
 import { Label } from '@/app/components/ui/label'
 import { Separator } from '@/app/components/ui/separator'
@@ -188,6 +189,7 @@ function ConnectionSection () {
 
 function AccountSection () {
   const { user } = useAuthState()
+  const { data: subscription, isLoading: subLoading } = useSubscription()
 
   const userInitials = (user?.name ?? '?')
     .split(' ')
@@ -196,10 +198,12 @@ function AccountSection () {
     .toUpperCase()
     .slice(0, 2)
 
-  // TODO: wire to real usage data via IPC
-  const creditsUsed = 142
-  const creditsTotal = 400
-  const usagePercent = Math.round((creditsUsed / creditsTotal) * 100)
+  const creditsUsed = subscription?.subscription.creditsUsed ?? 0
+  const creditsPerMonth = subscription?.plan.creditsPerMonth ?? 400
+  const isUnlimited = creditsPerMonth === -1
+  const usagePercent = isUnlimited ? 0 : Math.round((creditsUsed / creditsPerMonth) * 100)
+  const planName = subscription?.plan.name ?? 'Free'
+  const planSlug = subscription?.plan.slug ?? 'free'
 
   return (
     <div>
@@ -216,7 +220,7 @@ function AccountSection () {
             <p className='text-sm font-medium text-foreground truncate'>{user?.name ?? 'Unknown'}</p>
             <p className='text-xs text-muted-foreground truncate'>{user?.email ?? ''}</p>
           </div>
-          <Badge variant='secondary'>Free</Badge>
+          <Badge variant='secondary'>{subLoading ? '...' : planName}</Badge>
         </div>
 
         <Separator className='my-4' />
@@ -226,34 +230,45 @@ function AccountSection () {
           <div className='flex items-center justify-between mb-2'>
             <span className='text-xs font-medium text-foreground'>Operations this month</span>
             <span className='text-xs font-mono text-muted-foreground tabular-nums'>
-              {creditsUsed} / {creditsTotal}
+              {isUnlimited ? 'Unlimited' : `${creditsUsed} / ${creditsPerMonth}`}
             </span>
           </div>
-          <div className='h-2 rounded-full bg-muted overflow-hidden'>
-            <div
-              className={cn(
-                'h-full rounded-full transition-all duration-500',
-                usagePercent < 75 ? 'bg-primary' : usagePercent < 90 ? 'bg-yellow-500' : 'bg-red-500',
-              )}
-              style={{ width: `${usagePercent}%` }}
-            />
-          </div>
-          <p className='mt-1.5 text-[11px] text-muted-foreground'>
-            {creditsTotal - creditsUsed} operations remaining. Resets monthly.
-          </p>
+          {!isUnlimited && (
+            <>
+              <div className='h-2 rounded-full bg-muted overflow-hidden'>
+                <div
+                  className={cn(
+                    'h-full rounded-full transition-all duration-500',
+                    usagePercent < 75 ? 'bg-primary' : usagePercent < 90 ? 'bg-yellow-500' : 'bg-red-500',
+                  )}
+                  style={{ width: `${Math.min(usagePercent, 100)}%` }}
+                />
+              </div>
+              <p className='mt-1.5 text-[11px] text-muted-foreground'>
+                {creditsPerMonth - creditsUsed} operations remaining. Resets monthly.
+              </p>
+            </>
+          )}
+          {isUnlimited && (
+            <p className='text-[11px] text-muted-foreground'>
+              Unlimited operations with your {planName} plan.
+            </p>
+          )}
         </div>
 
         <Separator className='my-4' />
 
         {/* Actions */}
         <div className='flex items-center gap-3'>
-          <Button
-            variant='default'
-            size='sm'
-            onClick={() => electron.ipcRenderer.invoke('open-url', 'https://movesia.com/pricing')}
-          >
-            Upgrade Plan
-          </Button>
+          {planSlug === 'free' && (
+            <Button
+              variant='default'
+              size='sm'
+              onClick={() => electron.ipcRenderer.invoke('open-url', 'https://movesia.com/pricing')}
+            >
+              Upgrade Plan
+            </Button>
+          )}
           <Button
             variant='outline'
             size='sm'

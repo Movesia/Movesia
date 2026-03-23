@@ -3,6 +3,7 @@ import path from 'node:path';
 import { registerMenuIpc } from '@/ipc/menuIPC';
 import { registerAgentIpc } from '@/ipc/agentIPC';
 import { registerAuthIpc } from '@/ipc/authIPC';
+import { registerSubscriptionIpc } from '@/ipc/subscriptionIPC';
 import { registerUnityIpc } from '@/ipc/unityIPC';
 import { registerWindowStateChangedEvents } from '@/windowState';
 
@@ -114,5 +115,6 @@ function registerMainIPC (agentService?: AgentService | null, authService?: Auth
 
   if (authService) {
     registerAuthIpc(appWindow, authService);
+    registerSubscriptionIpc(appWindow, authService);
   }
 }

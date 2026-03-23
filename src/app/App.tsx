@@ -16,6 +16,7 @@ import { MenuChannels } from '@/channels/menuChannels';
 import { useThreads } from '@/app/hooks/useThreads';
 import { useChatState } from '@/app/hooks/useChatState';
 import type { ChatMessage } from '@/app/hooks/useChatState';
+import { useSubscription } from '@/app/hooks/useSubscription';
 
 import { Route, HashRouter as Router, Routes, useNavigate, useLocation } from 'react-router-dom';
 
@@ -119,12 +120,23 @@ function AppShell () {
     [deleteThread, currentThreadId, chatState]
   );
 
-  // Refresh thread list when a chat stream completes (to pick up auto-generated title)
+  // Subscription quota (auto-refresh after chat completes or errors)
+  const { refresh: refreshQuota } = useSubscription();
+
+  // Refresh thread list + quota when a chat stream completes
   useEffect(() => {
     if (chatState.status === 'ready' && chatState.threadId) {
       refreshThreads();
+      refreshQuota();
     }
-  }, [chatState.status, chatState.threadId, refreshThreads]);
+  }, [chatState.status, chatState.threadId, refreshThreads, refreshQuota]);
+
+  // Refresh quota on chat errors (to catch 402 quota exceeded)
+  useEffect(() => {
+    if (chatState.status === 'error') {
+      refreshQuota();
+    }
+  }, [chatState.status, refreshQuota]);
 
   // Clear stale chat state when the active project changes
   useEffect(() => {

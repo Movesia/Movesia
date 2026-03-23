@@ -41,6 +41,8 @@ const ALLOWED_SEND_CHANNELS = [
   'auth:sign-out',
   'auth:get-state',
   'auth:get-token',
+  // Subscription channels (renderer → main)
+  'subscription:get-quota',
 ];
 
 // Channels the main process sends to the renderer (renderer listens on)
@@ -50,6 +52,8 @@ const ALLOWED_RECEIVE_CHANNELS = [
   'chat:stream-event',
   'chat:stream-error',
   'auth:state-changed',
+  // Subscription channels (main → renderer)
+  'subscription:quota-changed',
   // Protocol channels (main → renderer)
   'protocol:url-received',
 ];

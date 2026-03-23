@@ -1,5 +1,6 @@
 import { useRef, useState, useCallback, useDeferredValue, memo } from 'react'
-import { ArrowUp, Plus, Paperclip, Image, FileCode, Square, X } from 'lucide-react'
+import { ArrowUp, Plus, Paperclip, Image, FileCode, Square, X, AlertTriangle } from 'lucide-react'
+import { useSubscription } from '@/app/hooks/useSubscription'
 import { Button } from '@/app/components/ui/button'
 import {
   DropdownMenu,
@@ -135,6 +136,7 @@ function findPendingTools(messages: ChatMessage[]): ToolPart[] {
 // =============================================================================
 
 export function ChatScreen ({ messages, isLoading, status, error, onSendMessage, onStop, onApproveAll, onRejectAll }: ChatScreenProps) {
+  const { data: subscription } = useSubscription()
   const isAwaitingApproval = status === 'awaiting_approval'
   const [input, setInput] = useState('')
   const [files, setFiles] = useState<File[]>([])
@@ -165,17 +167,62 @@ export function ChatScreen ({ messages, isLoading, status, error, onSendMessage,
     }
   }
 
+  // Credit warning state
+  const creditsPerMonth = subscription?.plan.creditsPerMonth ?? -1
+  const creditsUsed = subscription?.subscription.creditsUsed ?? 0
+  const isUnlimited = creditsPerMonth === -1
+  const creditsRemaining = isUnlimited ? -1 : creditsPerMonth - creditsUsed
+  const showCreditWarning = !isUnlimited && creditsRemaining >= 0 && creditsRemaining <= 15
+  const creditsExhausted = !isUnlimited && creditsRemaining <= 0
+
   const hasMessages = messages.length > 0 || isLoading
+
+  // Credit warning tab (rendered above the input, attached to it)
+  const creditWarningTab = showCreditWarning ? (
+    <div className='flex justify-center'>
+      <div className={`
+        inline-flex items-center gap-2.5 px-6 py-1.5
+        rounded-t-xl border border-b-0 text-xs font-medium -mb-px relative z-10
+        ${creditsExhausted
+          ? 'bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400'
+          : 'bg-muted/60 border-input text-muted-foreground'
+        }
+      `}>
+        <AlertTriangle className={`size-3.5 shrink-0 ${creditsExhausted ? '' : 'text-muted-foreground/70'}`} />
+        <span>
+          {creditsExhausted
+            ? 'No credits remaining'
+            : `${creditsRemaining} credit${creditsRemaining === 1 ? '' : 's'} remaining`
+          }
+        </span>
+        <span className='text-muted-foreground/40'>·</span>
+        <button
+          onClick={() => electron.ipcRenderer.invoke('open-url', 'https://movesia.com/pricing')}
+          className={`
+            text-xs font-semibold shrink-0 transition-colors
+            ${creditsExhausted
+              ? 'text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300'
+              : 'text-foreground/70 hover:text-foreground'
+            }
+          `}
+        >
+          Upgrade
+        </button>
+      </div>
+    </div>
+  ) : null
 
   // Shared prompt input component
   const promptInput = (
-    <PromptInput
-      value={input}
-      onValueChange={setInput}
-      isLoading={isLoading}
-      onSubmit={handleSubmit}
-      className='w-full max-w-[740px] mx-auto'
-    >
+    <div className='w-full max-w-[740px] mx-auto'>
+      {creditWarningTab}
+      <PromptInput
+        value={input}
+        onValueChange={setInput}
+        isLoading={isLoading}
+        onSubmit={handleSubmit}
+        className='w-full'
+      >
       {files.length > 0 && (
         <div className='flex flex-wrap gap-2 pb-2'>
           {files.map((file, index) => (
@@ -266,6 +313,7 @@ export function ChatScreen ({ messages, isLoading, status, error, onSendMessage,
         </Button>
       </PromptInputActions>
     </PromptInput>
+    </div>
   )
 
   // Empty state
@@ -340,7 +388,11 @@ export function ChatScreen ({ messages, isLoading, status, error, onSendMessage,
           {/* Error display */}
           {error && (
             <div className='py-2 px-4 bg-destructive/10 text-destructive rounded-lg text-sm'>
-              {error.message}
+              {error.message.includes('quota_exceeded') || error.message.includes('Monthly credit quota exceeded')
+                ? "You've used all your credits this month. Upgrade to Pro for unlimited access."
+                : error.message.includes('rate_limit') || error.message.includes('Rate limit exceeded')
+                  ? 'Too many requests. Please wait a moment and try again.'
+                  : error.message}
             </div>
           )}
         </ChatContainerContent>
@@ -352,7 +404,7 @@ export function ChatScreen ({ messages, isLoading, status, error, onSendMessage,
         </div>
       </ChatContainerRoot>
 
-      {/* Bottom area: approval panel OR prompt input */}
+      {/* Bottom area: credit warning + approval panel OR prompt input */}
       <div className='px-4 pb-4 pt-2'>
         {isAwaitingApproval && pendingTools.length > 0 && onApproveAll && onRejectAll ? (
           <ToolApprovalPanel
