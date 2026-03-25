@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useSyncExternalStore } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types (mirrored from website's /api/v1/subscription response)

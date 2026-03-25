@@ -11,7 +11,7 @@ import { ChatScreen } from '@/app/screens/chat';
 import { SettingsScreen } from '@/app/screens/settings';
 import { SetupScreen } from '@/app/screens/setup';
 import { SignInScreen } from '@/app/screens/signIn';
-import { UIDebuggerScreen } from '@/app/screens/ui-debugger';
+// import { UIDebuggerScreen } from '@/app/screens/ui-debugger';
 import { MenuChannels } from '@/channels/menuChannels';
 import { useThreads } from '@/app/hooks/useThreads';
 import { useChatState } from '@/app/hooks/useChatState';
@@ -217,7 +217,7 @@ function AppShell () {
               }
             />
             <Route path='/settings' Component={SettingsScreen} />
-            {__DEV__ && <Route path='/debug' Component={UIDebuggerScreen} />}
+            {/* {__DEV__ && <Route path='/debug' Component={UIDebuggerScreen} />} */}
           </Routes>
         </SidebarInset>
       </div>

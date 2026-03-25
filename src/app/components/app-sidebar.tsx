@@ -415,12 +415,12 @@ export function AppSidebar ({
                     <Settings />
                     Settings
                   </DropdownMenuItem>
-                  {__DEV__ && onDebug && (
+                  {/* {__DEV__ && onDebug && (
                     <DropdownMenuItem onClick={onDebug} className='cursor-pointer'>
                       <Bug />
                       UI Debugger
                     </DropdownMenuItem>
-                  )}
+                  )} */}
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
