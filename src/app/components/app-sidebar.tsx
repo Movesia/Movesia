@@ -8,7 +8,7 @@ import {
   LogOut,
   User,
   ArrowLeftRight,
-  Bug,
+  // Bug,
   ArrowUpCircle,
 } from 'lucide-react'
 import {
