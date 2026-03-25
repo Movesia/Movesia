@@ -66,6 +66,7 @@ const config: ForgeConfig = {
     new MakerSquirrel({
       name: productName,
       setupIcon: path.resolve(rootDir, 'assets/icons/icon.ico'),
+      loadingGif: path.resolve(rootDir, 'assets/icons/Movesia-FullLogo-White.png'),
       // Register movesia:// protocol on Windows during install
       // This creates registry entries for the protocol handler
     }),
