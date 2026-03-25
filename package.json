@@ -1,7 +1,7 @@
 {
   "name": "movesia",
   "productName": "movesia",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "AI-powered desktop assistant for Unity Editor — manage scenes, GameObjects, and scripts through natural conversation",
   "main": ".vite/build/main.js",
   "license": "MIT",
