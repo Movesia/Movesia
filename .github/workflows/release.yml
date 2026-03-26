@@ -17,7 +17,11 @@ jobs:
           - os: windows-latest
             platform: windows
           - os: macos-latest
-            platform: mac
+            platform: mac-arm64
+            arch: arm64
+          - os: macos-13
+            platform: mac-x64
+            arch: x64
           - os: ubuntu-latest
             platform: linux
 
@@ -47,7 +51,7 @@ jobs:
       # macOS: make ZIP only (appdmg native module doesn't compile in CI)
       - name: Make ZIP (${{ matrix.platform }})
         if: runner.os == 'macOS'
-        run: pnpm exec electron-forge make --targets=@electron-forge/maker-zip
+        run: pnpm exec electron-forge make --targets=@electron-forge/maker-zip --arch=${{ matrix.arch }}
 
       # macOS: create DMG using create-dmg (pure shell, no native node modules)
       - name: Install create-dmg (macOS)
@@ -65,8 +69,8 @@ jobs:
             --icon-size 100 \
             --icon "Movesia.app" 150 200 \
             --app-drop-link 450 200 \
-            "out/make/Movesia.dmg" \
-            "out/Movesia-darwin-arm64/Movesia.app" || true
+            "out/make/Movesia-${{ matrix.arch }}.dmg" \
+            "out/Movesia-darwin-${{ matrix.arch }}/Movesia.app" || true
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
