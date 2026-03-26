@@ -36,17 +36,16 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      # macOS: appdmg needs Python setuptools for native module (macos-alias)
+      - name: Install Python setuptools (macOS)
+        if: runner.os == 'macOS'
+        run: pip install setuptools
+
       - name: Install dependencies
         run: pnpm install
 
-      # macOS: use ZIP (DMG requires native deps that fail in CI)
       - name: Make (${{ matrix.platform }})
-        if: runner.os != 'macOS'
         run: pnpm run make
-
-      - name: Make (${{ matrix.platform }})
-        if: runner.os == 'macOS'
-        run: pnpm exec electron-forge make --targets=@electron-forge/maker-zip
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
