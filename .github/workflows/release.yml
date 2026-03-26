@@ -36,21 +36,37 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      # macOS: appdmg depends on macos-alias (native module) which needs
-      # Python setuptools for node-gyp, then an explicit rebuild
-      - name: Install Python setuptools (macOS)
-        if: runner.os == 'macOS'
-        run: pip install setuptools
-
       - name: Install dependencies
         run: pnpm install
 
-      - name: Rebuild native modules for DMG (macOS)
-        if: runner.os == 'macOS'
-        run: pnpm rebuild macos-alias
-
+      # Windows/Linux: run full make (Squirrel, DEB, RPM)
       - name: Make (${{ matrix.platform }})
+        if: runner.os != 'macOS'
         run: pnpm run make
+
+      # macOS: make ZIP only (appdmg native module doesn't compile in CI)
+      - name: Make ZIP (${{ matrix.platform }})
+        if: runner.os == 'macOS'
+        run: pnpm exec electron-forge make --targets=@electron-forge/maker-zip
+
+      # macOS: create DMG using create-dmg (pure shell, no native node modules)
+      - name: Install create-dmg (macOS)
+        if: runner.os == 'macOS'
+        run: brew install create-dmg
+
+      - name: Create DMG (${{ matrix.platform }})
+        if: runner.os == 'macOS'
+        run: |
+          create-dmg \
+            --volname "Movesia" \
+            --background "assets/dmgBackgroundImage.png" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "Movesia.app" 150 200 \
+            --app-drop-link 450 200 \
+            "out/make/Movesia.dmg" \
+            "out/Movesia-darwin-arm64/Movesia.app" || true
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
