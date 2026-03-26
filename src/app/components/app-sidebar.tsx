@@ -24,6 +24,7 @@ import {
   SidebarMenuButton,
   SidebarMenuAction,
   SidebarRail,
+  SidebarTrigger,
   useSidebar,
 } from '@/app/components/ui/sidebar'
 import {
@@ -289,6 +290,18 @@ export function AppSidebar ({
     <Sidebar collapsible='icon'>
       <SidebarHeader>
         <SidebarMenu>
+          {/* Sidebar toggle — always visible (icon when collapsed) */}
+          <SidebarMenuItem className='flex justify-end mb-2'>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <SidebarTrigger className='size-7 cursor-pointer' />
+              </TooltipTrigger>
+              <TooltipContent side='right'>
+                <p>Toggle Sidebar <kbd className='ml-1 text-[10px] opacity-60'>Ctrl+B</kbd></p>
+              </TooltipContent>
+            </Tooltip>
+          </SidebarMenuItem>
+
           {/* New Chat — always visible (icon when collapsed) */}
           <SidebarMenuItem>
             <SidebarMenuButton onClick={onNewThread} tooltip='New Chat' className='cursor-pointer'>
