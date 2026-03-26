@@ -1,8 +1,9 @@
 name: Build & Release
 
 on:
+  workflow_dispatch: # manual trigger from GitHub UI
   push:
-    tags: ['v*']
+    tags: ['v*'] # keep for real releases
 
 permissions:
   contents: write
@@ -38,7 +39,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Publish (${{ matrix.platform }})
+      - name: Make (${{ matrix.platform }})
+        run: pnpm run make
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: movesia-${{ matrix.platform }}
+          path: out/make/**/*
+
+      # Only publish to GitHub Releases when triggered by a tag
+      - name: Publish to GitHub Releases
+        if: startsWith(github.ref, 'refs/tags/v')
         run: pnpm run publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
