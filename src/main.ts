@@ -27,8 +27,8 @@ if (squirrelStartup) {
       const appName = 'movesia';
       const regPath = `HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\${appName}`;
       const entries: Record<string, string> = {
-        HelpLink: 'https://movesia.com/help',
-        URLInfoAbout: 'https://movesia.com',
+        HelpLink: 'https://movesia.com/docs',
+        URLInfoAbout: 'https://movesia.com/contact',
         URLUpdateInfo: 'https://github.com/Movesia/Movesia/releases',
         Comments: 'AI-powered desktop assistant for Unity game development',
       };
