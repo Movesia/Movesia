@@ -5,7 +5,7 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerRpm } from '@electron-forge/maker-rpm';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
-import { MakerZIP } from '@electron-forge/maker-zip';
+import { MakerDMG } from '@electron-forge/maker-dmg';
 import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
 import { PublisherGithub } from '@electron-forge/publisher-github';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
@@ -70,7 +70,10 @@ const config: ForgeConfig = {
       // Register movesia:// protocol on Windows during install
       // This creates registry entries for the protocol handler
     }),
-    new MakerZIP({}, ['darwin']),
+    new MakerDMG({
+      icon: path.resolve(rootDir, 'assets/icons/icon.icns'),
+      background: path.resolve(rootDir, 'assets/dmgBackgroundImage.png'),
+    }),
     new MakerRpm({
       options: {
         // Register movesia:// protocol on Linux (RPM)
