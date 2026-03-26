@@ -1,6 +1,5 @@
 import { useRendererListener } from '@/app/hooks';
 import { MenuChannels } from '@/channels/menuChannels';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/tooltip';
 import {
   DropdownMenu,
   DropdownMenuContent,
