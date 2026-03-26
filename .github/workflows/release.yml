@@ -36,13 +36,18 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      # macOS: appdmg needs Python setuptools for native module (macos-alias)
+      # macOS: appdmg depends on macos-alias (native module) which needs
+      # Python setuptools for node-gyp, then an explicit rebuild
       - name: Install Python setuptools (macOS)
         if: runner.os == 'macOS'
         run: pip install setuptools
 
       - name: Install dependencies
         run: pnpm install
+
+      - name: Rebuild native modules for DMG (macOS)
+        if: runner.os == 'macOS'
+        run: pnpm rebuild macos-alias
 
       - name: Make (${{ matrix.platform }})
         run: pnpm run make
