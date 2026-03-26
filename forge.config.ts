@@ -68,8 +68,13 @@ const config: ForgeConfig = {
       name: productName,
       setupIcon: path.resolve(rootDir, 'assets/icons/icon.ico'),
       loadingGif: path.resolve(rootDir, 'assets/icons/Movesia-FullLogo-White.png'),
-      // Register movesia:// protocol on Windows during install
-      // This creates registry entries for the protocol handler
+      // Apps & Features metadata
+      authors: author.name,
+      title: productName,
+      description:
+        'AI-powered desktop assistant for Unity Editor — manage scenes, GameObjects, and scripts through natural conversation',
+      iconUrl: 'https://cdn.movesia.com/assets/icon.ico',
+      copyright: `Copyright © ${new Date().getFullYear()} ${author.name}`,
     }),
     new MakerZIP({}, ['darwin']),
     new MakerDMG({

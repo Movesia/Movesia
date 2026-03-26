@@ -20,6 +20,25 @@ process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true';
 
 /** Handle creating/removing shortcuts on Windows when installing/uninstalling. */
 if (squirrelStartup) {
+  // Write extra ARP (Add/Remove Programs) registry entries that Squirrel doesn't set
+  if (process.argv.includes('--squirrel-install') || process.argv.includes('--squirrel-updated')) {
+    try {
+      const { execSync } = await import('node:child_process');
+      const appName = 'movesia';
+      const regPath = `HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\${appName}`;
+      const entries: Record<string, string> = {
+        HelpLink: 'https://movesia.com/help',
+        URLInfoAbout: 'https://movesia.com',
+        URLUpdateInfo: 'https://github.com/Movesia/Movesia/releases',
+        Comments: 'AI-powered desktop assistant for Unity game development',
+      };
+      for (const [key, value] of Object.entries(entries)) {
+        execSync(`reg add "${regPath}" /v "${key}" /t REG_SZ /d "${value}" /f`, { stdio: 'ignore' });
+      }
+    } catch {
+      // Non-critical — don't block install if registry writes fail
+    }
+  }
   app.quit();
 }
 
