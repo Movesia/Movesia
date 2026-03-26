@@ -1,13 +1,13 @@
 /**
  * THE LIBRARIAN: knowledge_search
  * "I need to look up documentation, workflows, or in-depth guides."
- * Consumes: Qdrant vector store collections via embeddings + search
+ * Consumes: Movesia proxy for embeddings + Qdrant vector search.
  */
 
 import { z } from 'zod'
 import { DynamicStructuredTool } from '@langchain/core/tools'
-import { getQdrantClient, getQdrantConfig, getCollectionNames, getCollectionMeta, embedQuery } from './rag-config'
-import type { SearchResult, SearchToolResponse } from './types'
+import { getQdrantConfig, getCollectionNames, getCollectionMeta, embedQuery, searchViaProxy } from './rag-config'
+import type { SearchToolResponse } from './types'
 
 const PREFIX = '[RAG]'
 const log = {
@@ -65,16 +65,7 @@ async function knowledgeSearchImpl(input: KnowledgeSearchInput, _config?: any): 
   if (!qdrantConfig) {
     return JSON.stringify({
       error: 'Knowledge base not configured.',
-      hint: 'Set QDRANT_URL and QDRANT_API_KEY environment variables.',
-      example: 'knowledge_search({ query: "rigidbody physics", collections: ["unity-docs"] })',
-    }, null, 2)
-  }
-
-  const client = getQdrantClient()
-  if (!client) {
-    return JSON.stringify({
-      error: 'Failed to initialize Qdrant client.',
-      hint: 'Check QDRANT_URL and QDRANT_API_KEY environment variables.',
+      hint: 'RAG configuration was not initialized during agent creation.',
       example: 'knowledge_search({ query: "rigidbody physics", collections: ["unity-docs"] })',
     }, null, 2)
   }
@@ -90,7 +81,7 @@ async function knowledgeSearchImpl(input: KnowledgeSearchInput, _config?: any): 
     }, null, 2)
   }
 
-  // ── EMBED THE QUERY ──
+  // ── EMBED THE QUERY (via proxy → OpenRouter) ──
   let embedding: number[]
   try {
     embedding = await embedQuery(query)
@@ -105,102 +96,51 @@ async function knowledgeSearchImpl(input: KnowledgeSearchInput, _config?: any): 
     }, null, 2)
   }
 
-  // ── RESOLVE DEFAULTS ──
-  // Low default threshold (0.35) — let the limit control result count, not the score cutoff
+  // ── RESOLVE PER-COLLECTION PARAMS ──
   const effectiveThreshold = scoreThreshold ?? qdrantConfig.scoreThreshold ?? 0.35
 
-  // ── SEARCH EACH COLLECTION IN PARALLEL ──
-  const allResults: SearchResult[] = []
-  const errors: string[] = []
-
-  const searchPromises = collections.map(async (collectionName) => {
-    const meta = getCollectionMeta(collectionName)
-    if (!meta) {
-      return { collectionName, results: [] as SearchResult[], error: `No metadata for '${collectionName}'` }
-    }
-
-    // Per-collection smart limit: agent override > collection default
-    const effectiveLimit = explicitLimit ?? meta.defaultLimit
-
-    try {
-      const response = await client.search(collectionName, {
-        vector: embedding,
-        limit: effectiveLimit,
-        score_threshold: effectiveThreshold,
-        with_payload: true,
-      })
-
-      const results: SearchResult[] = response.map((point) => {
-        const payload = (point.payload ?? {}) as Record<string, unknown>
-
-        // Extract content from the configured field for this collection
-        const content = String(payload[meta.contentField] ?? '')
-
-        // Build metadata from remaining payload fields
-        const metadata = { ...payload }
-        delete metadata[meta.contentField]
-
-        // Convert BigInt IDs to string (Qdrant returns BigInt for large integer IDs)
-        const id = typeof point.id === 'bigint' ? String(point.id) : point.id
-
-        return {
-          id,
-          score: point.score ?? 0,
-          content,
-          metadata,
-          collection: collectionName,
-        }
-      })
-
-      log.debug(`[${collectionName}] ${results.length} results (limit=${effectiveLimit}, threshold=${effectiveThreshold})`)
-      return { collectionName, results, error: null }
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err)
-
-      if (errorMsg.includes('Not found') || errorMsg.includes("doesn't exist")) {
-        return { collectionName, results: [] as SearchResult[], error: `Collection '${collectionName}' does not exist in Qdrant.` }
-      }
-      if (errorMsg.includes('timeout') || errorMsg.includes('ETIMEDOUT')) {
-        return { collectionName, results: [] as SearchResult[], error: `Qdrant timed out searching '${collectionName}'.` }
-      }
-      if (errorMsg.includes('401') || errorMsg.includes('403') || errorMsg.includes('Unauthorized')) {
-        return { collectionName, results: [] as SearchResult[], error: 'Authentication failed for Qdrant. Check the API key.' }
-      }
-
-      return { collectionName, results: [] as SearchResult[], error: `Failed to search '${collectionName}': ${errorMsg}` }
+  const collectionsPayload = collections.map(name => {
+    const meta = getCollectionMeta(name)
+    return {
+      name,
+      limit: explicitLimit ?? meta?.defaultLimit,
+      score_threshold: effectiveThreshold,
     }
   })
 
-  const searchResults = await Promise.all(searchPromises)
+  // ── SEARCH VIA PROXY (proxy → Qdrant on server) ──
+  try {
+    const proxyResult = await searchViaProxy(embedding, collectionsPayload)
 
-  for (const { results, error } of searchResults) {
-    allResults.push(...results)
-    if (error) errors.push(error)
+    log.info(`knowledge_search: "${query.slice(0, 60)}" → ${proxyResult.total_results} results from [${collections.join(', ')}]`)
+
+    // Build the SearchToolResponse
+    const response: SearchToolResponse = {
+      success: proxyResult.success,
+      query,
+      collections_searched: collections,
+      total_results: proxyResult.total_results,
+      results: proxyResult.results,
+    }
+
+    if (proxyResult.errors && proxyResult.errors.length > 0 && proxyResult.total_results > 0) {
+      response.hint = `Partial results. Errors: ${proxyResult.errors.join('; ')}`
+    } else if (proxyResult.errors && proxyResult.errors.length > 0 && proxyResult.total_results === 0) {
+      response.hint = `No results. Errors: ${proxyResult.errors.join('; ')}`
+    } else if (proxyResult.total_results === 0) {
+      response.hint = 'No relevant results found. Try broadening your query, using different keywords, or lowering the score_threshold.'
+    }
+
+    return JSON.stringify(response, null, 2)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    log.error(`Search failed: ${msg}`)
+    return JSON.stringify({
+      error: `Failed to search knowledge base: ${msg}`,
+      hint: 'The knowledge base may be temporarily unavailable. Try again in a moment.',
+      example: 'knowledge_search({ query: "rigidbody physics", collections: ["unity-docs"] })',
+    }, null, 2)
   }
-
-  // ── SORT BY SCORE (descending) ──
-  allResults.sort((a, b) => b.score - a.score)
-
-  // ── BUILD RESPONSE ──
-  const response: SearchToolResponse = {
-    success: errors.length === 0,
-    query,
-    collections_searched: collections,
-    total_results: allResults.length,
-    results: allResults,
-  }
-
-  if (errors.length > 0 && allResults.length > 0) {
-    response.hint = `Partial results. Errors: ${errors.join('; ')}`
-  } else if (errors.length > 0 && allResults.length === 0) {
-    response.hint = `No results. Errors: ${errors.join('; ')}`
-  } else if (allResults.length === 0) {
-    response.hint = 'No relevant results found. Try broadening your query, using different keywords, or lowering the score_threshold.'
-  }
-
-  log.info(`knowledge_search: "${query.slice(0, 60)}" → ${allResults.length} results from [${collections.join(', ')}]`)
-
-  return JSON.stringify(response, null, 2)
 }
 
 // ─────────────────────────────────────────────────────────────

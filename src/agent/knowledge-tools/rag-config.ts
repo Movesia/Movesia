@@ -1,17 +1,16 @@
 /**
- * Qdrant client configuration, connection management, and query embedding.
+ * RAG configuration, query embedding, and proxy search.
  *
- * Pattern mirrors unity-tools/connection.ts:
- *   setQdrantConfig(config)  →  module-level singleton
- *   getQdrantClient()        →  lazy-initialized QdrantClient
- *   embedQuery(text)         →  calls OpenRouter embeddings API → float[]
+ * Both embedding and vector search go through the Movesia website proxy:
+ *   embedQuery(text)         →  POST /api/v1/embeddings  →  OpenRouter
+ *   searchViaProxy(...)      →  POST /api/v1/rag/search  →  Qdrant (localhost on server)
+ *
+ * The Electron app never connects to Qdrant directly.
  */
 
-import { QdrantClient } from '@qdrant/js-client-rest'
-import type { QdrantConfig, CollectionMeta } from './types'
+import type { QdrantConfig, CollectionMeta, SearchResult } from './types'
 
-// Simple logger — avoids importing UnityConnection/config which has
-// ESM re-export issues when run outside Vite (e.g., tsx profiler script).
+// Simple logger
 const PREFIX = '[RAG]'
 const log = {
   debug: (msg: string) => console.debug(`${PREFIX} ${msg}`),
@@ -24,46 +23,25 @@ const log = {
 // MODULE-LEVEL SINGLETON
 // =============================================================================
 
-/** Module-level Qdrant configuration */
+/** Module-level RAG configuration */
 let _config: QdrantConfig | null = null
 
-/** Lazy-initialized Qdrant client */
-let _client: QdrantClient | null = null
-
 /**
- * Set the Qdrant configuration. Called from agent.ts during agent creation.
+ * Set the RAG configuration. Called from agent.ts during agent creation.
  */
 export function setQdrantConfig(config: QdrantConfig): void {
   _config = config
-  _client = null // Reset client so it reinitializes on next use
-  log.info(`Qdrant configured: ${config.url} (${config.collections.length} collections)`)
+  log.info(`RAG configured (${config.collections.length} collections, proxy-only)`)
   for (const col of config.collections) {
     log.debug(`  Collection: ${col.name} — ${col.description} [field: ${col.contentField}, limit: ${col.defaultLimit}]`)
   }
 }
 
 /**
- * Get the current Qdrant configuration, or null if not set.
+ * Get the current RAG configuration, or null if not set.
  */
 export function getQdrantConfig(): QdrantConfig | null {
   return _config
-}
-
-/**
- * Get or create the Qdrant client instance (lazy initialization).
- * Returns null if config is not set.
- */
-export function getQdrantClient(): QdrantClient | null {
-  if (!_config) return null
-  if (!_client) {
-    _client = new QdrantClient({
-      url: _config.url,
-      apiKey: _config.apiKey,
-      timeout: _config.timeout ?? 10_000,
-    })
-    log.debug('Qdrant client initialized')
-  }
-  return _client
 }
 
 /**
@@ -81,28 +59,37 @@ export function getCollectionMeta(name: string): CollectionMeta | undefined {
 }
 
 // =============================================================================
-// QUERY EMBEDDING
+// HELPER: get a fresh access token
+// =============================================================================
+
+async function getToken(): Promise<string> {
+  if (!_config) throw new Error('RAG config not set')
+  const token = _config.getAccessToken
+    ? (await _config.getAccessToken() ?? _config.openRouterApiKey)
+    : _config.openRouterApiKey
+  if (!token) throw new Error('No access token available for RAG')
+  return token
+}
+
+// =============================================================================
+// QUERY EMBEDDING (via proxy)
 // =============================================================================
 
 /**
  * Embed a text query using the Movesia proxy's embeddings endpoint.
  *
  * Routes through the website backend which validates the OAuth token
- * and forwards to OpenRouter with the server-side API key.
- * Default model: openai/text-embedding-3-small (1536 dimensions).
+ * and forwards to OpenRouter (always, regardless of chat provider).
+ * Sends model="default" — the proxy resolves it to openai/text-embedding-3-small.
  */
 export async function embedQuery(text: string): Promise<number[]> {
   if (!_config) {
-    throw new Error('Qdrant config not set — cannot embed query')
+    throw new Error('RAG config not set — cannot embed query')
   }
 
-  const model = _config.embeddingModel ?? 'openai/text-embedding-3-small'
+  const model = _config.embeddingModel ?? 'default'
   const proxyBaseUrl = process.env.MOVESIA_AUTH_URL || 'https://movesia.com'
-
-  // Get a fresh token per-request so expired tokens trigger on-demand refresh
-  const token = _config.getAccessToken
-    ? (await _config.getAccessToken() ?? _config.openRouterApiKey)
-    : _config.openRouterApiKey
+  const token = await getToken()
 
   const response = await fetch(`${proxyBaseUrl}/api/v1/embeddings`, {
     method: 'POST',
@@ -131,4 +118,47 @@ export async function embedQuery(text: string): Promise<number[]> {
   }
 
   return embedding
+}
+
+// =============================================================================
+// VECTOR SEARCH (via proxy)
+// =============================================================================
+
+/** Response shape from the /api/v1/rag/search proxy endpoint. */
+interface ProxySearchResponse {
+  success: boolean
+  total_results: number
+  results: SearchResult[]
+  errors?: string[]
+}
+
+/**
+ * Search Qdrant collections via the Movesia proxy.
+ *
+ * The proxy connects to Qdrant on localhost:6333 (same VPS), validates
+ * the OAuth token, and returns results. The Electron app never talks
+ * to Qdrant directly.
+ */
+export async function searchViaProxy(
+  embedding: number[],
+  collections: Array<{ name: string; limit?: number; score_threshold?: number }>,
+): Promise<ProxySearchResponse> {
+  const proxyBaseUrl = process.env.MOVESIA_AUTH_URL || 'https://movesia.com'
+  const token = await getToken()
+
+  const response = await fetch(`${proxyBaseUrl}/api/v1/rag/search`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ embedding, collections }),
+  })
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '')
+    throw new Error(`RAG search failed (${response.status}): ${body}`)
+  }
+
+  return response.json() as Promise<ProxySearchResponse>
 }

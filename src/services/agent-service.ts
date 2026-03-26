@@ -48,28 +48,18 @@ const LANGSMITH_ENDPOINT =
   process.env.LANGSMITH_ENDPOINT ?? 'https://api.smith.langchain.com'
 const LANGSMITH_PROJECT = process.env.LANGSMITH_PROJECT ?? ''
 
-// Qdrant configuration for knowledge search (RAG)
-const QDRANT_URL = process.env.QDRANT_URL ?? ''
-const QDRANT_API_KEY = process.env.QDRANT_API_KEY ?? ''
-
 /**
- * Build the Qdrant configuration for knowledge search.
- * Returns undefined if QDRANT_URL or QDRANT_API_KEY are not set.
+ * Build the RAG configuration for knowledge search.
  *
- * @param accessToken - OAuth access token for embedding API calls
+ * Both embedding and vector search go through the website proxy — the
+ * Electron app never connects to Qdrant directly. No QDRANT_URL or
+ * QDRANT_API_KEY needed here; those live on the server.
  */
-function buildQdrantConfig(accessToken: string, authService?: AuthService): QdrantConfig | undefined {
-  if (!QDRANT_URL || !QDRANT_API_KEY) {
-    return undefined
-  }
-
+function buildQdrantConfig(accessToken: string, authService?: AuthService): QdrantConfig {
   return {
-    url: QDRANT_URL,
-    apiKey: QDRANT_API_KEY,
     openRouterApiKey: accessToken,
-    // Per-request token getter — triggers on-demand refresh if expired
     getAccessToken: authService ? () => authService.getAccessToken() : undefined,
-    embeddingModel: 'openai/text-embedding-3-small',
+    embeddingModel: 'default', // Resolved server-side by the proxy
     scoreThreshold: 0.35,
     timeout: 10_000,
     collections: [
@@ -358,7 +348,7 @@ export class AgentService {
     const ok = (v: string) => (v ? '\u2713' : '\u2717')
     const hasAuth = this.authService ? ok('yes') : ok('')
     logger.info(
-      `Config: Auth ${hasAuth}  Tavily ${ok(TAVILY_API_KEY)}  LangSmith ${ok(LANGSMITH_API_KEY)}  Qdrant ${ok(QDRANT_URL && QDRANT_API_KEY ? 'yes' : '')}`
+      `Config: Auth ${hasAuth}  Tavily ${ok(TAVILY_API_KEY)}  LangSmith ${ok(LANGSMITH_API_KEY)}  RAG ${ok('yes')}`
     )
 
     if (this.config.projectPath) {

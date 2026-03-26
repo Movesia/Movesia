@@ -271,7 +271,7 @@ export interface CreateAgentOptions {
   openRouterApiKey?: string;
   tavilyApiKey?: string;
   projectPath?: string;
-  qdrantConfig?: QdrantConfig;
+  qdrantConfig: QdrantConfig;
 }
 
 /**
@@ -280,7 +280,7 @@ export interface CreateAgentOptions {
  * Uses langchain's `createAgent` which supports middleware as a first-class
  * parameter.
  */
-export function createMovesiaAgent (options: CreateAgentOptions = {}) {
+export function createMovesiaAgent (options: CreateAgentOptions) {
   const {
     checkpointer = new MemorySaver(),
     store,
@@ -301,20 +301,15 @@ export function createMovesiaAgent (options: CreateAgentOptions = {}) {
     setUnityManager(unityManager);
   }
 
-  // Configure Qdrant for knowledge search if provided
-  if (qdrantConfig) {
-    setQdrantConfig(qdrantConfig);
-  }
+  // Configure RAG knowledge search (always enabled — proxy handles Qdrant)
+  setQdrantConfig(qdrantConfig);
 
   // Create model
   const llm = createModel(openRouterApiKey);
   const modelName = (llm as any).modelName ?? 'unknown';
 
-  // Get tools + add todo middleware tool + knowledge search (if configured)
-  const tools = [...getAllTools(tavilyApiKey), todoMiddleware.tool];
-  if (qdrantConfig) {
-    tools.push(knowledgeSearch);
-  }
+  // Get tools + add todo middleware tool + knowledge search (always included)
+  const tools = [...getAllTools(tavilyApiKey), todoMiddleware.tool, knowledgeSearch];
   const toolNames = tools.map((t: any) => t.name).join(', ');
 
   // Build system prompt.

@@ -18,22 +18,21 @@ export interface CollectionMeta {
 }
 
 /**
- * Configuration for connecting to Qdrant vector store.
+ * Configuration for RAG knowledge search.
+ *
+ * The Electron app never connects to Qdrant directly — both embedding
+ * and vector search go through the website proxy on movesia.com.
  */
 export interface QdrantConfig {
-  /** Qdrant server URL (e.g., "https://my-cluster.qdrant.io:6333") */
-  url: string
-  /** Qdrant API key */
-  apiKey: string
   /** Available collections with metadata */
   collections: CollectionMeta[]
-  /** OAuth access token for embedding requests (used as fallback if getAccessToken is not set) */
+  /** OAuth access token for API calls (used as fallback if getAccessToken is not set) */
   openRouterApiKey: string
   /** Async getter for a fresh access token — called per-request so expired tokens trigger on-demand refresh */
   getAccessToken?: () => Promise<string | null>
-  /** Embedding model identifier (default: "openai/text-embedding-3-small") */
+  /** Embedding model identifier (default: "default" — resolved server-side) */
   embeddingModel?: string
-  /** Minimum similarity score (default: 0.7) */
+  /** Minimum similarity score (default: 0.35) */
   scoreThreshold?: number
   /** Request timeout in ms (default: 10000) */
   timeout?: number
