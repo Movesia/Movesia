@@ -107,7 +107,7 @@ function registerMainIPC (agentService?: AgentService | null, authService?: Auth
    */
   registerWindowStateChangedEvents(appWindow);
   registerMenuIpc(appWindow);
-  registerUnityIpc(appWindow);
+  registerUnityIpc(appWindow, authService);
 
   if (agentService) {
     registerAgentIpc(appWindow, agentService);

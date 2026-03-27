@@ -34,6 +34,7 @@ const ALLOWED_SEND_CHANNELS = [
   'unity:check-running',
   'unity:check-package',
   'unity:install-package',
+  'unity:check-package-update',
   // Settings channels
   'settings:get-last-project',
   // Auth channels (renderer → main)
@@ -54,6 +55,8 @@ const ALLOWED_RECEIVE_CHANNELS = [
   'auth:state-changed',
   // Subscription channels (main → renderer)
   'subscription:quota-changed',
+  // Unity package progress (main → renderer)
+  'unity:package-progress',
   // Protocol channels (main → renderer)
   'protocol:url-received',
 ];

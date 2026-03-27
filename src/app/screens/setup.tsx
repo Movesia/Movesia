@@ -233,6 +233,12 @@ export function SetupScreen() {
   const [installing, setInstalling] = useState(false)
   const [installError, setInstallError] = useState<string | null>(null)
 
+  // Package update state
+  const [latestVersion, setLatestVersion] = useState<string | null>(null)
+  const [updateAvailable, setUpdateAvailable] = useState(false)
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null)
+  const [installStage, setInstallStage] = useState<string | null>(null)
+
   const [unityRunning, setUnityRunning] = useState(false)
   const [checkingUnity, setCheckingUnity] = useState(false)
 
@@ -280,6 +286,20 @@ export function SetupScreen() {
     }
   }, [])
 
+  // -- Listen for package download progress ---------------------------------
+  useEffect(() => {
+    const handler = (_event: unknown, data: { stage: string; percent?: number }) => {
+      setInstallStage(data.stage)
+      if (data.stage === 'downloading' && data.percent != null) {
+        setDownloadProgress(data.percent)
+      } else {
+        setDownloadProgress(null)
+      }
+    }
+    electron.ipcRenderer.on('unity:package-progress', handler)
+    return () => { electron.ipcRenderer.removeListener('unity:package-progress', handler) }
+  }, [])
+
   // -- Set project path on agent service when project changes ---------------
   // This starts the WebSocket server and sets the target project on UnityManager
   useEffect(() => {
@@ -288,6 +308,8 @@ export function SetupScreen() {
       setUnityRunning(false)
       setWsConnected(false)
       setInstallError(null)
+      setLatestVersion(null)
+      setUpdateAvailable(false)
       return
     }
 
@@ -303,14 +325,20 @@ export function SetupScreen() {
         // and sets the target project on UnityManager.
         await electron.ipcRenderer.invoke('unity:set-project', selectedProject!.path)
 
-        const [pkgResult, runningResult] = await Promise.all([
+        const [pkgResult, runningResult, updateResult] = await Promise.all([
           electron.ipcRenderer.invoke('unity:check-package', selectedProject!.path),
           electron.ipcRenderer.invoke('unity:check-running', selectedProject!.path),
+          electron.ipcRenderer.invoke('unity:check-package-update', selectedProject!.path),
         ])
 
         if (!cancelled) {
           setPackageStatus(pkgResult ?? { installed: false })
           setUnityRunning(runningResult ?? false)
+
+          if (updateResult) {
+            setLatestVersion(updateResult.latestVersion)
+            setUpdateAvailable(updateResult.updateAvailable)
+          }
         }
       } catch (err) {
         console.error('Failed to initialize project:', err)
@@ -346,11 +374,13 @@ export function SetupScreen() {
     return () => clearInterval(interval)
   }, [selectedProject])
 
-  // -- Install package ------------------------------------------------------
+  // -- Install or update package ---------------------------------------------
   const handleInstall = useCallback(async () => {
     if (!selectedProject) return
     setInstalling(true)
     setInstallError(null)
+    setDownloadProgress(null)
+    setInstallStage(null)
 
     try {
       const result = await electron.ipcRenderer.invoke(
@@ -360,6 +390,8 @@ export function SetupScreen() {
 
       if (result?.success) {
         setPackageStatus({ installed: true, version: result.version })
+        setUpdateAvailable(false)
+        setLatestVersion(result.version ?? latestVersion)
       } else {
         setInstallError(result?.error ?? 'Installation failed.')
       }
@@ -368,8 +400,10 @@ export function SetupScreen() {
       setInstallError('An unexpected error occurred during installation.')
     } finally {
       setInstalling(false)
+      setDownloadProgress(null)
+      setInstallStage(null)
     }
-  }, [selectedProject])
+  }, [selectedProject, latestVersion])
 
   // -- Auto-redirect when all checks pass (including WS connection) ---------
   const allDone = selectedProject && packageStatus.installed && unityRunning && wsConnected
@@ -395,7 +429,7 @@ export function SetupScreen() {
         ? 'error'
         : checkingPackage
           ? 'active'
-          : packageStatus.installed
+          : packageStatus.installed && !updateAvailable
             ? 'completed'
             : 'active'
 
@@ -456,30 +490,28 @@ export function SetupScreen() {
             icon={MovesiaLogo}
             title='Install the Movesia package'
             description={
-              packageStatus.installed
+              packageStatus.installed && !updateAvailable
                 ? 'The Movesia Unity package is installed and ready.'
-                : 'Install the Movesia package into your Unity project to enable communication.'
+                : updateAvailable && packageStatus.installed
+                  ? `Update available: v${packageStatus.version} → v${latestVersion}`
+                  : 'Install the Movesia package into your Unity project to enable communication.'
             }
             status={step2Status}
             badge={
               packageStatus.installed && packageStatus.version ? (
-                <Badge variant='secondary' className='text-[10px] px-1.5 py-0'>
+                <Badge
+                  variant={updateAvailable ? 'outline' : 'secondary'}
+                  className={cn(
+                    'text-[10px] px-1.5 py-0',
+                    updateAvailable && 'border-amber-500/30 text-amber-600'
+                  )}
+                >
                   v{packageStatus.version}
                 </Badge>
               ) : undefined
             }
             action={
-              selectedProject && !packageStatus.installed && !installing ? (
-                <Button
-                  variant='outline'
-                  size='sm'
-                  onClick={handleInstall}
-                  className='text-xs'
-                >
-                  <Download className='size-3.5' />
-                  Install
-                </Button>
-              ) : installing ? (
+              installing ? (
                 <Button
                   variant='outline'
                   size='sm'
@@ -487,11 +519,38 @@ export function SetupScreen() {
                   className='text-xs'
                 >
                   <Loader2 className='size-3.5 animate-spin' />
-                  Installing...
+                  {installStage === 'downloading' && downloadProgress != null
+                    ? `${downloadProgress}%`
+                    : installStage === 'extracting'
+                      ? 'Extracting...'
+                      : installStage === 'installing'
+                        ? 'Installing...'
+                        : 'Checking...'}
+                </Button>
+              ) : selectedProject && (!packageStatus.installed || updateAvailable) ? (
+                <Button
+                  variant='outline'
+                  size='sm'
+                  onClick={handleInstall}
+                  className='text-xs'
+                >
+                  <Download className='size-3.5' />
+                  {updateAvailable && packageStatus.installed
+                    ? `Update${latestVersion ? ` to v${latestVersion}` : ''}`
+                    : `Install${latestVersion ? ` v${latestVersion}` : ''}`}
                 </Button>
               ) : undefined
             }
           >
+            {/* Download progress bar */}
+            {installing && downloadProgress != null && (
+              <div className='w-full bg-muted rounded-full h-1.5 overflow-hidden'>
+                <div
+                  className='bg-primary h-full rounded-full transition-all duration-300'
+                  style={{ width: `${downloadProgress}%` }}
+                />
+              </div>
+            )}
             {installError && (
               <div className='flex items-start gap-1.5 text-xs text-destructive'>
                 <AlertCircle className='size-3.5 shrink-0 mt-0.5' />

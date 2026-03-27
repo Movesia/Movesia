@@ -7,6 +7,7 @@ export const UnityChannels = {
   CHECK_RUNNING: 'unity:check-running',
   CHECK_PACKAGE: 'unity:check-package',
   INSTALL_PACKAGE: 'unity:install-package',
+  CHECK_PACKAGE_UPDATE: 'unity:check-package-update',
 } as const;
 
 /** Channels the renderer can invoke (renderer → main) */
@@ -16,4 +17,5 @@ export const UNITY_SEND_CHANNELS = [
   UnityChannels.CHECK_RUNNING,
   UnityChannels.CHECK_PACKAGE,
   UnityChannels.INSTALL_PACKAGE,
+  UnityChannels.CHECK_PACKAGE_UPDATE,
 ] as const;
