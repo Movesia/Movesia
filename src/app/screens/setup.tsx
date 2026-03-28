@@ -406,7 +406,8 @@ export function SetupScreen() {
   }, [selectedProject, latestVersion])
 
   // -- Auto-redirect when all checks pass (including WS connection) ---------
-  const allDone = selectedProject && packageStatus.installed && unityRunning && wsConnected
+  // Don't redirect if a package update is available — let user see the update button first
+  const allDone = selectedProject && packageStatus.installed && !updateAvailable && unityRunning && wsConnected
 
   useEffect(() => {
     if (allDone) {

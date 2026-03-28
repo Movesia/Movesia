@@ -141,16 +141,21 @@ export function registerUnityIpc(
         }
       };
 
-      const result = await installOrUpdate(projectPath, token, onProgress);
+      let result = await installOrUpdate(projectPath, token, onProgress);
 
       // If auth expired mid-download, retry once with refreshed token
       if (!result.success && result.error?.includes('Session expired')) {
         const freshToken = await authService.getAccessToken();
         if (freshToken && freshToken !== token) {
           console.info(`${LOG_PREFIX} Retrying install with refreshed token`);
-          return installOrUpdate(projectPath, freshToken, onProgress);
+          result = await installOrUpdate(projectPath, freshToken, onProgress);
         }
       }
+
+      // Notify renderer of final state so all listeners (sidebar, setup, etc.) stay in sync
+      onProgress(result.success
+        ? { stage: 'done' }
+        : { stage: 'error', error: result.error ?? 'Installation failed' });
 
       return result;
     }

@@ -6,7 +6,7 @@ import { AppSidebar } from '@/app/components/app-sidebar';
 import type { UserProfile } from '@/app/components/app-sidebar';
 import Titlebar from '@/app/components/titlebar';
 import { AppContextMenu } from '@/app/components/context-menu';
-import { useRendererListener, useUnityStatus, useAuthState } from '@/app/hooks';
+import { useRendererListener, useUnityStatus, useAuthState, usePackageUpdate } from '@/app/hooks';
 import { ChatScreen } from '@/app/screens/chat';
 import { SettingsScreen } from '@/app/screens/settings';
 import { SetupScreen } from '@/app/screens/setup';
@@ -56,6 +56,9 @@ function AppShell () {
 
   // Shared Unity connection status (polled every 3s)
   const unityStatus = useUnityStatus();
+
+  // Package update check (polled every 5 min when connected to a project)
+  const packageUpdate = usePackageUpdate(unityStatus.projectPath);
 
   // Thread management (database-backed, filtered by active project)
   const {
@@ -182,7 +185,13 @@ function AppShell () {
 
   return (
     <SidebarProvider defaultOpen={false} className='flex-col h-full min-h-0'>
-      <Titlebar unityStatus={unityStatus} onSwitchProject={handleSwitchProject} />
+      <Titlebar
+        unityStatus={unityStatus}
+        onSwitchProject={handleSwitchProject}
+        packageUpdate={packageUpdate.update}
+        onInstallPackage={packageUpdate.installUpdate}
+        packageInstallProgress={packageUpdate.installProgress}
+      />
       <div className='min-h-0 flex-1 flex'>
         <AppSidebar
           threads={threads}
@@ -196,6 +205,9 @@ function AppShell () {
           onSignOut={handleSignOut}
           onDebug={__DEV__ ? handleDebug : undefined}
           onUpgradePlan={handleUpgradePlan}
+          packageUpdate={packageUpdate.update}
+          onInstallPackage={packageUpdate.installUpdate}
+          packageInstallProgress={packageUpdate.installProgress}
         />
         <SidebarInset>
           <Routes>

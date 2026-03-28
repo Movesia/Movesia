@@ -10,6 +10,7 @@ import {
   ArrowLeftRight,
   // Bug,
   ArrowUpCircle,
+  Download,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -64,6 +65,9 @@ interface AppSidebarProps {
   onSwitchProject?: () => void
   onDebug?: () => void
   onUpgradePlan?: () => void
+  packageUpdate?: { installedVersion: string | null; latestVersion: string | null; updateAvailable: boolean; cached: boolean } | null
+  onInstallPackage?: () => void
+  packageInstallProgress?: { stage: string; percent?: number; error?: string }
 }
 
 // =============================================================================
@@ -260,6 +264,9 @@ export function AppSidebar ({
   onSwitchProject,
   onDebug,
   onUpgradePlan,
+  packageUpdate,
+  onInstallPackage,
+  packageInstallProgress,
 }: AppSidebarProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const { state: sidebarState, isMobile } = useSidebar()
@@ -377,6 +384,60 @@ export function AppSidebar ({
             )}
           </>
         ) : null}
+        {/* Unity package update — pushed to bottom of content area */}
+        {(packageUpdate?.updateAvailable || (packageInstallProgress && packageInstallProgress.stage !== 'idle')) && (
+          <div className='mt-auto px-3 pb-2 group-data-[collapsible=icon]:px-1.5'>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={packageInstallProgress?.stage === 'idle' || !packageInstallProgress ? onInstallPackage : undefined}
+                  disabled={!!packageInstallProgress && packageInstallProgress.stage !== 'idle'}
+                  className='flex items-center gap-2 rounded-md px-2 py-1.5 text-[11px] text-muted-foreground hover:text-foreground bg-muted hover:bg-accent/50 transition-colors cursor-pointer w-full group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-1.5 disabled:opacity-70 disabled:cursor-default'
+                >
+                  {packageInstallProgress?.stage === 'downloading' ? (
+                    <div className='size-3.5 shrink-0 animate-spin rounded-full border-[1.5px] border-muted-foreground border-t-transparent' />
+                  ) : packageInstallProgress?.stage === 'extracting' || packageInstallProgress?.stage === 'installing' ? (
+                    <div className='size-3.5 shrink-0 animate-spin rounded-full border-[1.5px] border-muted-foreground border-t-transparent' />
+                  ) : packageInstallProgress?.stage === 'done' ? (
+                    <svg className='size-3.5 shrink-0 text-green-500' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.5'><polyline points='20 6 9 17 4 12' /></svg>
+                  ) : packageInstallProgress?.stage === 'error' ? (
+                    <svg className='size-3.5 shrink-0 text-red-500' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.5'><line x1='18' y1='6' x2='6' y2='18' /><line x1='6' y1='6' x2='18' y2='18' /></svg>
+                  ) : (
+                    <Download className='size-3.5 shrink-0' />
+                  )}
+                  {sidebarState === 'expanded' && (
+                    <span className='truncate'>
+                      {packageInstallProgress?.stage === 'downloading'
+                        ? `Downloading${packageInstallProgress.percent ? ` ${packageInstallProgress.percent}%` : '…'}`
+                        : packageInstallProgress?.stage === 'extracting'
+                          ? 'Extracting…'
+                          : packageInstallProgress?.stage === 'installing'
+                            ? 'Installing…'
+                            : packageInstallProgress?.stage === 'done'
+                              ? 'Updated!'
+                              : packageInstallProgress?.stage === 'error'
+                                ? 'Update failed'
+                                : `Unity package v${packageUpdate?.latestVersion} available`}
+                    </span>
+                  )}
+                </button>
+              </TooltipTrigger>
+              {sidebarState !== 'expanded' && (
+                <TooltipContent side='right'>
+                  {packageInstallProgress?.stage === 'downloading'
+                    ? `Downloading${packageInstallProgress.percent ? ` ${packageInstallProgress.percent}%` : '…'}`
+                    : packageInstallProgress?.stage === 'extracting' || packageInstallProgress?.stage === 'installing'
+                      ? 'Installing…'
+                      : packageInstallProgress?.stage === 'done'
+                        ? 'Updated!'
+                        : packageInstallProgress?.stage === 'error'
+                          ? 'Update failed'
+                          : `Unity package v${packageUpdate?.latestVersion} available`}
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </div>
+        )}
       </SidebarContent>
 
       <SidebarFooter className='border-t border-sidebar-border'>

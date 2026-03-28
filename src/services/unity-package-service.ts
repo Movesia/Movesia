@@ -41,8 +41,9 @@ export interface InstallResult {
 }
 
 export type ProgressCallback = (info: {
-  stage: 'checking' | 'downloading' | 'extracting' | 'installing';
+  stage: 'checking' | 'downloading' | 'extracting' | 'installing' | 'done' | 'error';
   percent?: number;
+  error?: string;
 }) => void;
 
 // ── Paths ──────────────────────────────────────────────────────────────
@@ -65,15 +66,34 @@ function getTempPath(version: string): string {
  * Compare two semver strings. Returns:
  *  -1 if a < b, 0 if equal, 1 if a > b
  */
+/**
+ * Compare two semver strings. Returns:
+ *  -1 if a < b, 0 if equal, 1 if a > b
+ *
+ * Handles pre-release suffixes: 0.1.0-test < 0.1.0 < 0.1.1
+ * Per semver spec, a pre-release version has lower precedence
+ * than the same version without a pre-release tag.
+ */
 export function compareSemver(a: string, b: string): number {
-  const pa = a.split('.').map(Number);
-  const pb = b.split('.').map(Number);
+  // Split off pre-release suffix (e.g. "0.1.0-test" → ["0.1.0", "test"])
+  const [aCore, aPre] = a.split('-', 2);
+  const [bCore, bPre] = b.split('-', 2);
+
+  const pa = aCore.split('.').map(Number);
+  const pb = bCore.split('.').map(Number);
+
   for (let i = 0; i < 3; i++) {
     const va = pa[i] ?? 0;
     const vb = pb[i] ?? 0;
     if (va < vb) return -1;
     if (va > vb) return 1;
   }
+
+  // Numeric parts are equal — check pre-release
+  // Has pre-release < no pre-release (e.g. 0.1.0-test < 0.1.0)
+  if (aPre && !bPre) return -1;
+  if (!aPre && bPre) return 1;
+
   return 0;
 }
 

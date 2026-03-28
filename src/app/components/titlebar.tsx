@@ -11,7 +11,8 @@ import {
 import { UnityStatusIndicator, statusTooltip } from '@/app/components/chat/UnityStatusIndicator';
 import type { UnityStatus } from '@/app/hooks/useUnityStatus';
 import { cn } from '@/app/lib/utils';
-import { ArrowLeftRight } from 'lucide-react';
+import { ArrowLeftRight, ArrowUpCircle } from 'lucide-react';
+import type { PackageUpdateInfo } from '@/app/hooks/usePackageUpdate';
 
 import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
@@ -28,9 +29,12 @@ const handleDoubleClick = () => {
 interface TitlebarProps {
   unityStatus: UnityStatus
   onSwitchProject: () => void
+  packageUpdate?: PackageUpdateInfo | null
+  onInstallPackage?: () => void
+  packageInstallProgress?: { stage: string; percent?: number; error?: string }
 }
 
-export default function Titlebar ({ unityStatus, onSwitchProject }: TitlebarProps) {
+export default function Titlebar ({ unityStatus, onSwitchProject, packageUpdate, onInstallPackage, packageInstallProgress }: TitlebarProps) {
   const [windowState, setWindowState] = useState<WindowState>('normal');
   const location = useLocation();
   const isSignInScreen = location.pathname === '/';
@@ -84,6 +88,29 @@ export default function Titlebar ({ unityStatus, onSwitchProject }: TitlebarProp
                       </div>
                     </div>
                   </DropdownMenuLabel>
+                  {packageUpdate?.updateAvailable && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={onInstallPackage}
+                        disabled={!!packageInstallProgress && packageInstallProgress.stage !== 'idle'}
+                        className='cursor-pointer text-muted-foreground'
+                      >
+                        {packageInstallProgress && packageInstallProgress.stage !== 'idle' ? (
+                          <div className='size-4 animate-spin rounded-full border-[1.5px] border-muted-foreground border-t-transparent' />
+                        ) : (
+                          <ArrowUpCircle className='size-4' />
+                        )}
+                        {packageInstallProgress?.stage === 'downloading'
+                          ? `Downloading${packageInstallProgress.percent ? ` ${packageInstallProgress.percent}%` : '…'}`
+                          : packageInstallProgress?.stage === 'extracting' || packageInstallProgress?.stage === 'installing'
+                            ? 'Installing…'
+                            : packageInstallProgress?.stage === 'done'
+                              ? 'Updated!'
+                              : `Unity package v${packageUpdate.latestVersion} available`}
+                      </DropdownMenuItem>
+                    </>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={onSwitchProject} className='cursor-pointer'>
                     <ArrowLeftRight className='size-4' />
