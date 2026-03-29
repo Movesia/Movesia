@@ -243,6 +243,7 @@ export function SetupScreen() {
   const [checkingUnity, setCheckingUnity] = useState(false)
 
   const [wsConnected, setWsConnected] = useState(false)
+  const [wsError, setWsError] = useState<string | null>(null)
 
   // -- Scanning projects ----------------------------------------------------
   const scanProjects = useCallback(async () => {
@@ -307,6 +308,7 @@ export function SetupScreen() {
       setPackageStatus({ installed: false })
       setUnityRunning(false)
       setWsConnected(false)
+      setWsError(null)
       setInstallError(null)
       setLatestVersion(null)
       setUpdateAvailable(false)
@@ -318,6 +320,7 @@ export function SetupScreen() {
     async function initProject() {
       setCheckingPackage(true)
       setCheckingUnity(true)
+      setWsError(null)
 
       try {
         // Tell the agent service about the selected project.
@@ -342,6 +345,10 @@ export function SetupScreen() {
         }
       } catch (err) {
         console.error('Failed to initialize project:', err)
+        if (!cancelled) {
+          const message = err instanceof Error ? err.message : String(err)
+          setWsError(message)
+        }
       } finally {
         if (!cancelled) {
           setCheckingPackage(false)
@@ -366,6 +373,12 @@ export function SetupScreen() {
         ])
         setUnityRunning(running ?? false)
         setWsConnected(status?.connected ?? false)
+        // Surface server-side errors (e.g. port conflict, init failure)
+        if (status?.error && !status?.connected) {
+          setWsError(status.error)
+        } else if (status?.connected) {
+          setWsError(null)
+        }
       } catch {
         // ignore poll errors
       }
@@ -447,7 +460,9 @@ export function SetupScreen() {
       ? 'pending'
       : wsConnected
         ? 'completed'
-        : 'active'
+        : wsError
+          ? 'error'
+          : 'active'
 
   // -- Render ---------------------------------------------------------------
   return (
@@ -592,11 +607,28 @@ export function SetupScreen() {
             description={
               wsConnected
                 ? 'Movesia is connected to the Unity Editor. You\'re all set!'
-                : 'Waiting for Unity to connect. If you just installed the package, focus the Unity Editor so it compiles the new scripts.'
+                : wsError || 'Waiting for Unity to connect. If you just installed the package, focus the Unity Editor so it compiles the new scripts.'
             }
             status={step4Status}
             action={
-              selectedProject && packageStatus.installed && unityRunning && !wsConnected ? (
+              wsError && selectedProject ? (
+                <Button
+                  variant='outline'
+                  size='sm'
+                  className='text-xs'
+                  onClick={async () => {
+                    setWsError(null)
+                    try {
+                      await electron.ipcRenderer.invoke('unity:set-project', selectedProject.path)
+                    } catch (err) {
+                      setWsError(err instanceof Error ? err.message : String(err))
+                    }
+                  }}
+                >
+                  <RefreshCw className='size-3.5' />
+                  Retry
+                </Button>
+              ) : selectedProject && packageStatus.installed && unityRunning && !wsConnected ? (
                 <Badge variant='outline' className='text-[10px] gap-1'>
                   <span className='size-1.5 rounded-full bg-amber-500 animate-pulse' />
                   Waiting

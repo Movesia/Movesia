@@ -303,6 +303,7 @@ export class AgentService {
   private config: AgentServiceConfig
   private authService: AuthService | null = null
   private isInitialized = false
+  private lastError: string | null = null
   private currentAbortController: AbortController | null = null
   private pendingApproval: {
     threadId: string
@@ -327,11 +328,26 @@ export class AgentService {
     logger.info('Initializing...')
     logger.debug(`Project: ${this.config.projectPath ?? 'none'}`)
 
-    // Database
-    setStoragePath(this.config.storagePath)
-    initDatabase()
-    this.repository = getRepository()
-    logger.info(`Database ready (${this.config.storagePath})`)
+    // Unity manager — created FIRST so WebSocket connections always work,
+    // even if database or agent initialization fails later.
+    this.unityManager = createUnityManager({
+      onDomainEvent: async msg => {
+        logger.debug(`Unity domain event: ${msg.type}`)
+      },
+    })
+    setUnityManager(this.unityManager)
+    logger.info('Unity manager created')
+
+    // Database — errors here must not prevent WebSocket connections
+    try {
+      setStoragePath(this.config.storagePath)
+      initDatabase()
+      this.repository = getRepository()
+      logger.info(`Database ready (${this.config.storagePath})`)
+    } catch (err) {
+      logger.error(`Database initialization failed: ${(err as Error).message}`, err as Error)
+      logger.warn('Continuing without database — chat history will not be persisted')
+    }
 
     // API keys (OpenRouter key removed — proxied via website backend)
     if (TAVILY_API_KEY) {
@@ -354,15 +370,6 @@ export class AgentService {
     if (this.config.projectPath) {
       process.env.UNITY_PROJECT_PATH = this.config.projectPath
     }
-
-    // Unity manager
-    this.unityManager = createUnityManager({
-      onDomainEvent: async msg => {
-        logger.debug(`Unity domain event: ${msg.type}`)
-      },
-    })
-
-    setUnityManager(this.unityManager)
 
     // Agent — requires a valid auth token to create the model
     const accessToken = await this.authService?.getAccessToken()
@@ -874,20 +881,27 @@ export class AgentService {
     connected: boolean
     projectPath?: string
     isCompiling: boolean
+    error?: string
   } {
     if (!this.unityManager) {
-      return { connected: false, isCompiling: false }
+      return {
+        connected: false,
+        isCompiling: false,
+        error: this.lastError ?? 'Unity manager not initialized',
+      }
     }
 
     return {
       connected: this.unityManager.isConnected,
       projectPath: this.unityManager.currentProject,
       isCompiling: this.unityManager.isCompiling,
+      error: this.lastError ?? undefined,
     }
   }
 
   async setProjectPath(newPath: string): Promise<void> {
     logger.info(`Project path → ${newPath}`)
+    this.lastError = null
 
     this.config.projectPath = newPath
     process.env.UNITY_PROJECT_PATH = newPath
@@ -899,30 +913,45 @@ export class AgentService {
       await this.unityManager.setTargetProject(newPath)
     }
 
+    // Start WebSocket server — this is critical for Unity connection.
+    // Errors here (e.g. port in use) must be surfaced to the user.
     if (!this.wsServer) {
-      await this.startWebSocketServer()
+      try {
+        await this.startWebSocketServer()
+      } catch (err) {
+        const msg = `WebSocket server failed to start: ${(err as Error).message}`
+        logger.error(msg, err as Error)
+        this.lastError = msg
+        throw err // Propagate so the setup screen can show the error
+      }
     }
 
     // Recreate the agent so middleware (filesystem, etc.) gets the project path.
-    // The agent's middleware stack is frozen at creation time, so we must rebuild it.
-    const accessToken = await this.authService?.getAccessToken()
-    if (!accessToken) {
-      logger.error('Cannot recreate agent for project path — not authenticated')
-      return
+    // Agent creation failures must NOT block the WebSocket connection —
+    // the server is already running, Unity can connect.
+    try {
+      const accessToken = await this.authService?.getAccessToken()
+      if (!accessToken) {
+        logger.error('Cannot recreate agent for project path — not authenticated')
+      } else {
+        const checkpointer = getCheckpointSaver()
+        const store = getSqliteStore()
+        this.agent = createMovesiaAgent({
+          checkpointer,
+          store,
+          unityManager: this.unityManager ?? undefined,
+          openRouterApiKey: accessToken,
+          tavilyApiKey: TAVILY_API_KEY || undefined,
+          projectPath: newPath,
+          qdrantConfig: buildQdrantConfig(accessToken, this.authService),
+        })
+        logger.info('Agent recreated with filesystem middleware')
+      }
+    } catch (err) {
+      logger.error(`Agent creation failed (WebSocket still running): ${(err as Error).message}`, err as Error)
+      // Don't throw — the WebSocket server is running and Unity can connect.
+      // Chat will fail, but the setup screen should still proceed.
     }
-
-    const checkpointer = getCheckpointSaver()
-    const store = getSqliteStore()
-    this.agent = createMovesiaAgent({
-      checkpointer,
-      store,
-      unityManager: this.unityManager ?? undefined,
-      openRouterApiKey: accessToken,
-      tavilyApiKey: TAVILY_API_KEY || undefined,
-      projectPath: newPath,
-      qdrantConfig: buildQdrantConfig(accessToken, this.authService),
-    })
-    logger.info('Agent recreated with filesystem middleware')
 
     // Persist as last project for auto-reconnect on next launch
     setLastProject(lastProjectFromPath(newPath))
