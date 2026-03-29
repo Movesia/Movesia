@@ -49,16 +49,33 @@ const config: ForgeConfig = {
       },
     ],
     // Copy native modules into the package (Vite doesn't include node_modules)
+    // then rebuild them against Electron's Node headers so ABI versions match.
     afterCopy: [
-      (buildPath, _electronVersion, _platform, _arch, callback) => {
-        for (const mod of nativeModules) {
-          const src = path.resolve(rootDir, 'node_modules', mod);
-          const dst = path.resolve(buildPath, 'node_modules', mod);
-          if (fs.existsSync(src)) {
-            fs.cpSync(src, dst, { recursive: true });
+      async (buildPath, electronVersion, platform, arch, callback) => {
+        try {
+          // 1. Copy native modules (Vite doesn't include node_modules)
+          for (const mod of nativeModules) {
+            const src = path.resolve(rootDir, 'node_modules', mod);
+            const dst = path.resolve(buildPath, 'node_modules', mod);
+            if (fs.existsSync(src)) {
+              fs.cpSync(src, dst, { recursive: true });
+            }
           }
+
+          // 2. Rebuild native modules for Electron's Node version
+          const { rebuild } = await import('@electron/rebuild');
+          await rebuild({
+            buildPath,
+            electronVersion,
+            arch,
+            onlyModules: ['better-sqlite3'],
+            force: true,
+          });
+
+          callback();
+        } catch (err) {
+          callback(err as Error);
         }
-        callback();
       },
     ],
   },
