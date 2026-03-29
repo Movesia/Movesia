@@ -8,7 +8,7 @@ import {
   LogOut,
   User,
   ArrowLeftRight,
-  // Bug,
+  Bug,
   ArrowUpCircle,
   Download,
 } from 'lucide-react'
@@ -489,12 +489,12 @@ export function AppSidebar ({
                     <Settings />
                     Settings
                   </DropdownMenuItem>
-                  {/* {__DEV__ && onDebug && (
+                  {__DEV__ && onDebug && (
                     <DropdownMenuItem onClick={onDebug} className='cursor-pointer'>
                       <Bug />
-                      UI Debugger
+                      Debug Console
                     </DropdownMenuItem>
-                  )} */}
+                  )}
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>

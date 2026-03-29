@@ -5,6 +5,7 @@ import { registerAgentIpc } from '@/ipc/agentIPC';
 import { registerAuthIpc } from '@/ipc/authIPC';
 import { registerSubscriptionIpc } from '@/ipc/subscriptionIPC';
 import { registerUnityIpc } from '@/ipc/unityIPC';
+import { registerDebugIpc } from '@/ipc/debugIPC';
 import { registerWindowStateChangedEvents } from '@/windowState';
 
 import { BrowserWindow, Menu, app } from 'electron';
@@ -107,6 +108,7 @@ function registerMainIPC (agentService?: AgentService | null, authService?: Auth
    */
   registerWindowStateChangedEvents(appWindow);
   registerMenuIpc(appWindow);
+  registerDebugIpc(appWindow);
   registerUnityIpc(appWindow, authService);
 
   if (agentService) {

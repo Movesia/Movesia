@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ThemeProvider } from '@/app/components/theme-provider';
 import { TooltipProvider } from '@/app/components/ui/tooltip';
 import { SidebarProvider, SidebarInset } from '@/app/components/ui/sidebar';
@@ -12,6 +12,7 @@ import { SettingsScreen } from '@/app/screens/settings';
 import { SetupScreen } from '@/app/screens/setup';
 import { SignInScreen } from '@/app/screens/signIn';
 // import { UIDebuggerScreen } from '@/app/screens/ui-debugger';
+import { DebugConsole } from '@/app/components/debug-console';
 import { MenuChannels } from '@/channels/menuChannels';
 import { useThreads } from '@/app/hooks/useThreads';
 import { useChatState } from '@/app/hooks/useChatState';
@@ -157,9 +158,25 @@ function AppShell () {
     navigate('/setup');
   }, [navigate]);
 
+  // Debug console panel (dev-only)
+  const [debugOpen, setDebugOpen] = useState(false);
+
   const handleDebug = useCallback(() => {
-    navigate('/debug');
-  }, [navigate]);
+    setDebugOpen(prev => !prev);
+  }, []);
+
+  // Ctrl+Shift+D keyboard shortcut (dev-only)
+  useEffect(() => {
+    if (!__DEV__) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+        e.preventDefault();
+        setDebugOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   const handleUpgradePlan = useCallback(() => {
     electron.ipcRenderer.invoke('open-url', 'https://movesia.com/pricing');
@@ -209,7 +226,7 @@ function AppShell () {
           onInstallPackage={packageUpdate.installUpdate}
           packageInstallProgress={packageUpdate.installProgress}
         />
-        <SidebarInset>
+        <SidebarInset className='relative'>
           <Routes>
             <Route path='/' Component={SignInScreen} />
             <Route path='/setup' Component={SetupScreen} />
@@ -229,8 +246,8 @@ function AppShell () {
               }
             />
             <Route path='/settings' Component={SettingsScreen} />
-            {/* {__DEV__ && <Route path='/debug' Component={UIDebuggerScreen} />} */}
           </Routes>
+          {__DEV__ && <DebugConsole open={debugOpen} onClose={() => setDebugOpen(false)} />}
         </SidebarInset>
       </div>
     </SidebarProvider>

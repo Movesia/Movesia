@@ -15,8 +15,13 @@ import {
   setMainWindow,
 } from './services/protocol-handler';
 import { createLogger, LogColors } from './agent/UnityConnection/config';
+import { logBuffer } from './services/log-buffer';
 
 process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true';
+
+// Install log buffer ASAP so all startup logs are captured
+// (used by the debug console panel in the renderer)
+logBuffer.install();
 
 /** Handle creating/removing shortcuts on Windows when installing/uninstalling. */
 if (squirrelStartup) {

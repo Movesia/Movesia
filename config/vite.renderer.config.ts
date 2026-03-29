@@ -44,7 +44,7 @@ export default defineConfig((env) => {
       __LINUX__: process.platform === 'linux',
       __APP_NAME__: JSON.stringify(productName),
       __APP_VERSION__: JSON.stringify(version),
-      __DEV__: process.env.NODE_ENV === 'development'
+      __DEV__: true // Force dev features on for testing builds (revert to: process.env.NODE_ENV === 'development')
     }
   };
 });

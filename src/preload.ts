@@ -37,6 +37,9 @@ const ALLOWED_SEND_CHANNELS = [
   'unity:check-package-update',
   // Settings channels
   'settings:get-last-project',
+  // Debug console channels (renderer → main)
+  'debug:get-logs',
+  'debug:clear-logs',
   // Auth channels (renderer → main)
   'auth:sign-in',
   'auth:sign-out',
@@ -57,6 +60,8 @@ const ALLOWED_RECEIVE_CHANNELS = [
   'subscription:quota-changed',
   // Unity package progress (main → renderer)
   'unity:package-progress',
+  // Debug console channels (main → renderer)
+  'debug:log-entry',
   // Protocol channels (main → renderer)
   'protocol:url-received',
 ];

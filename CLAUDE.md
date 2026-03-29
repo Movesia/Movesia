@@ -394,3 +394,49 @@ shadcn/ui components in `src/app/components/ui/`. prompt-kit components in `src/
 2. Export from `src/agent/unity-tools/index.ts`
 3. Tool uses `callUnityAsync()` from `connection.ts` to communicate with Unity
 4. Add to system prompt in `src/agent/prompts.ts`
+
+## Dev-Only Features (`__DEV__` Flag)
+
+The `__DEV__` global boolean controls developer-only features. It is set at **build time** by Vite in `config/vite.renderer.config.ts`:
+
+```typescript
+__DEV__: JSON.stringify(process.env.NODE_ENV === 'development')
+```
+
+- **`pnpm dev`** → `__DEV__ = true` (all dev features enabled)
+- **`pnpm run package` / `pnpm run make`** → `__DEV__ = false` (dev features stripped out)
+
+### Making a Debug Build for Production Testing
+
+To create a packaged build **with dev features enabled** (for diagnosing production-only bugs):
+
+1. In `config/vite.renderer.config.ts`, temporarily change `__DEV__` to:
+   ```typescript
+   __DEV__: JSON.stringify(true)
+   ```
+2. Run `pnpm run package`
+3. The resulting build will have all dev features available
+4. **Remember to revert the change before building a user release**
+
+### Current Dev Features
+
+| Feature | Trigger | Description |
+|---------|---------|-------------|
+| Debug Console | `Ctrl+Shift+D` or sidebar menu → "Debug Console" | Shows live main-process logs in the app (ring buffer of last 500 entries, level filtering, copy-to-clipboard) |
+
+### Adding New Dev Features
+
+Gate any dev-only UI behind the `__DEV__` flag so it is automatically stripped from production builds:
+
+```tsx
+// In renderer components:
+{__DEV__ && <MyDevComponent />}
+
+// In effects:
+useEffect(() => {
+  if (!__DEV__) return;
+  // dev-only logic
+}, []);
+```
+
+The `__DEV__` flag is only available in the **renderer process** (Vite defines it). For main-process dev gating, use `app.isPackaged` from Electron or check `process.env.NODE_ENV`.
